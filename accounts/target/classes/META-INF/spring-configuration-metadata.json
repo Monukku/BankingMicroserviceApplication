@@ -1,0 +1,27 @@
+{
+  "groups": [
+    {
+      "name": "accounts",
+      "type": "com.RewaBank.accounts.dto.AccountsContactInfoDto",
+      "sourceType": "com.RewaBank.accounts.dto.AccountsContactInfoDto"
+    }
+  ],
+  "properties": [
+    {
+      "name": "accounts.contact-details",
+      "type": "java.util.Map<java.lang.String,java.lang.String>",
+      "sourceType": "com.RewaBank.accounts.dto.AccountsContactInfoDto"
+    },
+    {
+      "name": "accounts.message",
+      "type": "java.lang.String",
+      "sourceType": "com.RewaBank.accounts.dto.AccountsContactInfoDto"
+    },
+    {
+      "name": "accounts.on-call-support",
+      "type": "java.util.List<java.lang.String>",
+      "sourceType": "com.RewaBank.accounts.dto.AccountsContactInfoDto"
+    }
+  ],
+  "hints": []
+}
