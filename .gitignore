@@ -1,0 +1,12 @@
+
+### Intellij IDEA ###
+
+.idea
+.factorypath
+.classpath
+.project
+.settings
+.springBeans
+*.ipr
+.log
+*.txt
