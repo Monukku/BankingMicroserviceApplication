@@ -1,0 +1,61 @@
+services:
+  configserver:
+    image: "usnamemonu/configserver:v1"
+    container_name: configserver-ms
+    ports:
+      - "8000:8000"
+    extends:
+      file: common-config.yml
+      service: microservice-base-config
+    healthcheck:
+      test: "curl --fail --silent localhost:8000/actuator/health/readiness | grep UP || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  accounts:
+    image: "usnamemonu/accounts:v1"
+    container_name: accounts-ms
+    ports:
+      - "8113:8113"
+    environment:
+      SPRING_APPLICATION_NAME: "accounts"
+    extends:
+      file: common-config.yml
+      service:  microservice-base-config
+    depends_on:
+      configserver:
+        condition: service_healthy
+
+  loans:
+    image: "usnamemonu/loans:v1"
+    container_name: loans-ms
+    ports:
+      - "8112:8112"
+    environment:
+      SPRING_APPLICATION_NAME: "loans"
+    extends:
+      file: common-config.yml
+      service:  microservice-base-config
+    depends_on:
+      configserver:
+        condition: service_healthy
+
+  cards:
+    image: "usnamemonu/cards:v1"
+    container_name: cards-ms
+    ports:
+      - "8111:8111"
+    environment:
+      SPRING_APPLICATION_NAME: "cards"
+    extends:
+      file: common-config.yml
+      service:  microservice-base-config
+    depends_on:
+      configserver:
+        condition: service_healthy
+
+networks:
+  rewabank:
+    driver: "bridge"

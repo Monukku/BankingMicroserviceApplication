@@ -1,0 +1,14 @@
+services:
+  network-deploy-service:
+    networks:
+      - rewabank
+
+  microservice-base-config:
+    extends:
+      service: network-deploy-service
+    deploy:
+      resources:
+        limits:
+          memory: 700m
+    environment:
+      SPRING_PROFILES_ACTIVE: default
