@@ -1,0 +1,42 @@
+package com.RewaBank.accounts.services.serviceImpl;
+
+import com.RewaBank.accounts.dto.AccountsMessageDto;
+import com.RewaBank.accounts.entity.Account;
+import com.RewaBank.accounts.entity.Customer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cloud.stream.function.StreamBridge;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.stereotype.Service;
+
+@Service
+public class CommunicationServiceImpl implements com.RewaBank.accounts.services.CommunicationService {
+     Logger  log= LoggerFactory.getLogger(CommunicationServiceImpl.class);
+        private final StreamBridge streamBridge;
+
+        public CommunicationServiceImpl(StreamBridge streamBridge) {
+            this.streamBridge = streamBridge;
+        }
+
+        @Override
+        public void sendCommunication(Account account, Customer customer) {
+            var accountsMsgDto = new AccountsMessageDto(
+                    account.getAccountNumber().toString(),
+                    customer.getName(),
+                    customer.getEmail(),
+                    customer.getMobileNumber()
+            );
+
+            log.info("🚀 Sending communication request for: {}", accountsMsgDto);
+
+            Message<AccountsMessageDto> message = MessageBuilder
+                    .withPayload(accountsMsgDto)
+                    .setHeader("accountId", account.getAccountNumber())  // ✅ Add partition key
+                    .build();
+
+            boolean result = streamBridge.send("sendCommunication-out-0", message);
+
+            log.info("✅ Communication request sent successfully? {}", result);
+        }
+    }
