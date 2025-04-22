@@ -1,0 +1,29 @@
+server:
+  port: 3000
+spring:
+  application:
+    name: "message"
+  cloud:
+    function:
+      definition: email|sms
+    stream:
+      bindings:
+        emailsms-in-0:
+          destination: send-communication
+          group: ${spring.application.name}
+          consumer:
+            concurrency: 3
+            partitioned: true
+        emailsms-out-0:
+          destination: communication-sent
+          producer:
+            partition-key-expression: headers['accountId']
+            partition-count: 5
+      kafka:
+        binder:
+          brokers:
+            - localhost:9092
+          autoAddPartitions: true
+  kafka:
+    properties:
+      spring.json.trusted.packages: "*"
