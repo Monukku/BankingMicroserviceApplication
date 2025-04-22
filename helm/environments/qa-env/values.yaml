@@ -1,0 +1,10 @@
+global:
+ configMapName: rewabankqa-configMapName
+ activeProfile: qa
+ configServerURL: configserver:http://configserver:8000/
+ eurekaServerURL: http://eurekaserver:8761/eureka/
+ keyCloakUrl: http://keycloak.default.svc.cluster.local:80/realms/master/protocol/openid-connect/certs
+ openTelemetryJavaAgent: "-javaagent:/app/libs/opentelemetry-javaagent-1.27.0.jar"
+ otelExporterEndPoint: http://tempo-grafana-tempo-distributor:4317
+ otelMetricsExporter: none
+ kafkaBrokerURL: kafka-controller-0.kafka-controller-headless.default.svc.cluster.local:9092

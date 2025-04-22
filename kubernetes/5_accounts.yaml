@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: accounts-deployment
+  labels:
+    app: accounts
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: accounts
+  template:
+    metadata:
+      labels:
+        app: accounts
+    spec:
+      containers:
+        - name: accounts
+          image: usnamemonu/accounts:v1
+          ports:
+            - containerPort: 8113
+          env:
+            - name: SPRING_APPLICATION_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: rewabank-configmap
+                  key: ACCOUNTS_APPLICATION_NAME
+            - name: SPRING_PROFILES_ACTIVE
+              valueFrom:
+                configMapKeyRef:
+                  name: rewabank-configmap
+                  key: SPRING_PROFILES_ACTIVE
+            - name: SPRING_CONFIG_IMPORT
+              valueFrom:
+                configMapKeyRef:
+                  name: rewabank-configmap
+                  key: SPRING_CONFIG_IMPORT
+            - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:
+                valueFrom:
+                  configMapKeyRef:
+                    name: rewabank-configmap
+                    key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: accounts
+spec:
+  selector:
+    app: accounts
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 8113
+      targetPort: 8113
+
+

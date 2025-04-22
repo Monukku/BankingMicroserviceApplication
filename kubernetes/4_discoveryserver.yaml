@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discoveryserver-deployment
+  labels:
+    app: discoveryserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discoveryserver
+  template:
+    metadata:
+      labels:
+        app: discoveryserver
+    spec:
+      containers:
+        - name: discoveryserver
+          image: usnamemonu/discoveryserver:v1
+          ports:
+            - containerPort: 8761
+          env:
+            - name: SPRING_APPLICATION_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: rewabank-configmap
+                  key: EUREKA_APPLICATION_NAME
+            - name: SPRING_CONFIG_IMPORT
+              valueFrom:
+                configMapKeyRef:
+                  name: rewabank-configmap
+                  key: SPRING_CONFIG_IMPORT
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discoveryserver
+spec:
+  selector:
+    app: discoveryserver
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 8761
+      targetPort: 8761
+
+

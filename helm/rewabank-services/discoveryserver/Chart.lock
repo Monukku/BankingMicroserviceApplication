@@ -1,0 +1,6 @@
+dependencies:
+- name: rewabank-common
+  repository: file://../../rewabank-common
+  version: 0.1.0
+digest: sha256:a0a7eb5a1ebed241c8e383d02adab1d451dd8e4cf0ecbbd9d5de06d2c05954f8
+generated: "2024-06-17T17:40:12.5359983+05:30"

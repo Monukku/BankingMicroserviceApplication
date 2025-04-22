@@ -1,0 +1,28 @@
+#This is a yaml formatted file
+#declared variables to be passed into your templates.
+
+deploymentName: configserver-deployment
+serviceName: configserver
+appLabel: configserver
+appName: configserver
+
+replicaCount: 1
+
+image:
+  repository: usnamemonu/configserver
+  tag: v1
+  
+containerPort: 8000
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+  
+appname_enabled: true
+profile-enabled: false
+config_enabled: false
+eureka_enabled: false
+resourceserver_enabled: false
+otel_enabled: true
+kafka_enabled: false

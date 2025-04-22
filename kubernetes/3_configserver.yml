@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: configserver-deployment
+  labels:
+    app: configserver
+spec:
+  replicas: 1
+  selector:
+     matchLabels:
+       app: configserver
+  template:
+    metadata:
+      labels:
+         app: configserver
+    spec:
+      containers:
+      - name: configserver
+        image: usnamemonu/configserver:v1
+        ports:
+        - containerPort: 8000
+---        
+apiVersion: apps/v1
+kind: Service
+metadata:
+  name: configserver
+spec:
+  selector:
+     app: configserver
+  type: LoadBalancer
+  ports: 
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      
+  

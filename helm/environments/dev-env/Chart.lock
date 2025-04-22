@@ -1,0 +1,27 @@
+dependencies:
+- name: rewabank-common
+  repository: file://../../rewabank-common
+  version: 0.1.0
+- name: configserver
+  repository: file://../../rewabank-services/configserver
+  version: 0.1.0
+- name: eurekaserver
+  repository: file://../../rewabank-services/discoveryserver
+  version: 0.1.0
+- name: accounts
+  repository: file://../../rewabank-services/accounts
+  version: 0.1.0
+- name: loans
+  repository: file://../../rewabank-services/loans
+  version: 0.1.0
+- name: cards
+  repository: file://../../rewabank-services/cards
+  version: 0.1.0
+- name: apigateway
+  repository: file://../../rewabank-services/apigateway
+  version: 0.1.0
+- name: message
+  repository: file://../../rewabank-services/message
+  version: 0.1.0
+digest: sha256:dd7136dd72df92c89867b6e96e4e961d3e33de85dc6b273e138865b8eccc04b4
+generated: "2024-06-17T18:44:16.6551058+05:30"

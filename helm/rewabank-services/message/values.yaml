@@ -1,0 +1,28 @@
+#This is a yaml formatted file
+#declared variables to be passed into your templates.
+
+deploymentName: message-deployment
+serviceName: message
+appLabel: message
+appName: message
+
+replicaCount: 1
+
+image:
+  repository: usnamemonu/message
+  tag: v1
+  
+containerPort: 8080
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  
+appname_enabled: true
+profile-enabled: false
+config_enabled: false
+eureka_enabled: false
+resourceserver_enabled: false
+otel_enabled: false
+kafka_enabled: true

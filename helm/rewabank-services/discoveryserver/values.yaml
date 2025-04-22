@@ -1,0 +1,28 @@
+#This is a yaml formatted file
+#declared variables to be passed into your templates.
+
+deploymentName: eurekaserver-deployment
+serviceName: eurekaserver
+appLabel: eurekaserver
+appName: eurekaserver
+
+replicaCount: 1
+
+image:
+  repository: usnamemonu/eurekaserver
+  tag: v1
+  
+containerPort: 8761
+
+service:
+  type: ClusterIP
+  port: 8761
+  targetPort: 8761
+  
+appname_enabled: true
+profile-enabled: false
+config_enabled: true
+eureka_enabled: false
+resourceserver_enabled: false
+otel_enabled: true
+kafka_enabled: false
