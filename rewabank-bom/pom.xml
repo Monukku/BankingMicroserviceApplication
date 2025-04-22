@@ -36,7 +36,6 @@
 		<micrometer.version>1.13.3</micrometer.version>
 		<image.tag>latest</image.tag>
 		<guava-version>32.0.1-jre</guava-version>
-
 		<sonar.organization>monukku</sonar.organization>
 		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
 	</properties>
