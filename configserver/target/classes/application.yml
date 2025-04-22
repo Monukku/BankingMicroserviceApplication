@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: "configserver"
+  profiles:
+    active: git
+  cloud:
+    config:
+      server:
+        # native:
+        # search-locations: "classpath:/config"
+        # search-locations: "file:///Users//eazybytes//Documents//config"
+        git:
+          uri: "https://github.com/Monukku/rewabank-config.git"
+          default-label: main
+          timeout: 15
+          clone-on-start: true
+          force-pull: true
+
+  rabbitmq:
+    host: "localhost"
+    port: 5672
+    username: "guest"
+    password: "guest"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    com:
+      RewaBank:
+        loans: DEBUG
+  pattern:
+    level: "%5p[${spring.application.name},%X{trace_ID},%X{span_id}]"
+
+encrypt:
+  key: "93E7949BA89A67A3F913285682146"
+
+server:
+  port: 8000

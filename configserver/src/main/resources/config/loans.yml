@@ -1,0 +1,11 @@
+build:
+  version: "3.0"
+
+loans:
+  message: "Welcome to rewabank accounts related local APIs "
+  contactDetails:
+    name: "monu kushwaha - Developer"
+    email: "monu@rewabank.com"
+  onCallSupport:
+    - (555) 555-1234
+    - (555) 523-1345

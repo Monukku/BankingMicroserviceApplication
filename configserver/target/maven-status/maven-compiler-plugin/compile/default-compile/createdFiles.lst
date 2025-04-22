@@ -1,0 +1,2 @@
+com\rewabank\configserver\ConfigserverApplication.class
+com\rewabank\configserver\controller\WebhookController.class
