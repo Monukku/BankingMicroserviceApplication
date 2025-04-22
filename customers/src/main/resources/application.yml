@@ -1,0 +1,56 @@
+server:
+  port: 8114
+spring:
+  application:
+    name: "customers"
+  profiles:
+    active: "prod"
+  datasource:
+    url: jdbc:postgresql://localhost:5432/customersdb
+    driverClassName: org.postgresql.Driver
+    username: postgres
+    password: 7250  # Change this in production!
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update  # Use "validate" in production
+    show-sql: true
+
+  config:
+    import: "optional:configserver:http://localhost:8000/"
+
+eureka:
+  instance:
+    preferIpAddress: true
+  client:
+    fetchRegistry: true
+    registerWithEureka: true
+    serviceUrl:
+      defaultZone: "http://localhost:8761/eureka/"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: "customer"
+    description: "Eazy Bank Customer Application"
+    version: "1.0.0"
+
+logging:
+  pattern:
+    console: "%green(%d{HH:mm:ss.SSS}) %blue(%-5level) %red([%thread]) %yellow(%logger{15}) - %msg%n"
+
+axon:
+  eventhandling:
+    processors:
+      customer-group:
+        mode: subscribing
+  axonserver:
+    servers: localhost:8124
