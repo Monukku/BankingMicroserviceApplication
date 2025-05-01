@@ -11,7 +11,7 @@ import com.RewaBank.accounts.entity.Accounts;
 import com.RewaBank.accounts.exception.ResourceNotFoundException;
 import com.RewaBank.accounts.repository.AccountsRepository;
 import com.RewaBank.accounts.services.IAccountsService;
-import com.RewaBank.accounts.services.kafka.KafkaProducerService;
+//import com.RewaBank.accounts.services.kafka.KafkaProducerService;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,10 +27,10 @@ public class AccountsServiceImpl implements IAccountsService {
 
     private static final Logger log = LoggerFactory.getLogger(AccountsServiceImpl.class);
     private final AccountsRepository accountsRepository;
-    private final KafkaProducerService kafkaProducerService;
-    public AccountsServiceImpl(AccountsRepository accountsRepository,KafkaProducerService kafkaProducerService) {
+//    private final KafkaProducerService kafkaProducerService;
+    public AccountsServiceImpl(AccountsRepository accountsRepository) {
         this.accountsRepository = accountsRepository;
-        this.kafkaProducerService=kafkaProducerService;
+//        this.kafkaProducerService=kafkaProducerService;
     }
 
     @Override
