@@ -2,7 +2,6 @@ package com.RewaBank.accounts.services.kafka;
 
 import com.RewaBank.accounts.dto.AccountsMessageDto;
 import com.RewaBank.accounts.entity.Accounts;
-import com.RewaBank.accounts.entity.Customer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.stream.function.StreamBridge;

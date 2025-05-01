@@ -11,6 +11,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -78,14 +79,17 @@ import java.math.BigDecimal;
 //}
 
 
-@Getter
-@Setter
+@Data
 @Schema(name = "Accounts", description = "Schema to hold accounts details")
 public class AccountsDto {
 
     @Pattern(regexp = "^[0-9]{10}$", message = "Account number must be 10 digits")
     @NotNull(message = "Account number cannot be null")
     private Long accountNumber;
+
+    @Pattern(regexp = "^[0-9]{10}$", message = "Mobile number must be 10 digits")
+    @NotNull(message = "Account number cannot be null")
+    private String mobileNumber;
 
     @NotEmpty(message = "Branch address cannot be null or empty")
     private String branchAddress;
@@ -105,8 +109,11 @@ public class AccountsDto {
     @NotNull(message = "Balance cannot be null")
     private BigDecimal balance;
 
-    private Long userId;
+    @NotNull(message = "Customer Id cannot be null")
+    private Long customerId;
 
     @Size(max = 500, message = "Account description must be less than 500 characters")
     private String accountDescription;
+
+    private  boolean activeSw;
 }

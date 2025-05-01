@@ -85,7 +85,6 @@ import java.math.BigDecimal;
 //}
 //
 
-
 @Entity
 @Getter
 @Setter
@@ -123,22 +122,7 @@ public class Accounts extends BaseEntity {
     @Column(nullable = false)
     private AccountCategory accountCategory;
 
-    @ManyToOne(cascade = CascadeType.MERGE,fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_id")
-    private Customer customer;
-
     @Column(name="communication_sw")
-    private Boolean communicationSw;
+    private boolean activeSw;
 
-    public void addCustomer(Customer customer) {
-        this.customer = customer;
-        customer.getAccounts().add(this);
-    }
-
-    public void removeCustomer() {
-        if (this.customer != null) {
-            this.customer.getAccounts().remove(this);
-            this.customer = null;
-        }
-    }
 }

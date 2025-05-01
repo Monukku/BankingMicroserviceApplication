@@ -3,17 +3,13 @@ package com.RewaBank.accounts.services.serviceImpl;
 import com.RewaBank.accounts.Utility.AccountCategory;
 import com.RewaBank.accounts.Utility.AccountStatus;
 import com.RewaBank.accounts.Utility.AccountType;
+import com.RewaBank.accounts.exception.AccountAlreadyExistsException;
 import com.RewaBank.accounts.mapper.AccountsMapper;
-import com.RewaBank.accounts.mapper.CustomerMapper;
 import com.RewaBank.accounts.constants.AccountsConstants;
 import com.RewaBank.accounts.dto.AccountsDto;
-import com.RewaBank.accounts.dto.CustomerDto;
 import com.RewaBank.accounts.entity.Accounts;
-import com.RewaBank.accounts.entity.Customer;
-import com.RewaBank.accounts.exception.CustomerAlreadyExistsException;
 import com.RewaBank.accounts.exception.ResourceNotFoundException;
 import com.RewaBank.accounts.repository.AccountsRepository;
-import com.RewaBank.accounts.repository.CustomerRepository;
 import com.RewaBank.accounts.services.IAccountsService;
 import com.RewaBank.accounts.services.kafka.KafkaProducerService;
 import jakarta.transaction.Transactional;
@@ -28,48 +24,43 @@ import java.util.Random;
 @Transactional
 @Service
 public class AccountsServiceImpl implements IAccountsService {
+
     private static final Logger log = LoggerFactory.getLogger(AccountsServiceImpl.class);
     private final AccountsRepository accountsRepository;
-    private final CustomerRepository customerRepository;
     private final KafkaProducerService kafkaProducerService;
-
-    public AccountsServiceImpl(AccountsRepository accountsRepository, CustomerRepository customerRepository, KafkaProducerService kafkaProducerService) {
+    public AccountsServiceImpl(AccountsRepository accountsRepository,KafkaProducerService kafkaProducerService) {
         this.accountsRepository = accountsRepository;
-        this.customerRepository = customerRepository;
-        this.kafkaProducerService = kafkaProducerService;
+        this.kafkaProducerService=kafkaProducerService;
     }
 
     @Override
-    public void createAccount(CustomerDto customerDto, AccountType accountType) {
-        // Map DTO to Customer entity
-        Customer customer = CustomerMapper.mapToCustomer(customerDto, new Customer());
+    public void createAccount(String mobileNumber,AccountType accountType) {
+
 
         // Check if customer already exists
-        Optional<Customer> optionalCustomer = customerRepository.findByMobileNumber(customerDto.getMobileNumber());
-        if (optionalCustomer.isPresent()) {
-            throw new CustomerAlreadyExistsException("Customer already exists with the given mobile number: " + customerDto.getMobileNumber());
+        Optional<Accounts> optionalAccounts = accountsRepository.findByMobileNumberAndActiveSw(mobileNumber,AccountsConstants.ACTIVE_SW);
+        if (optionalAccounts.isPresent()) {
+            throw new AccountAlreadyExistsException("Account already exists with the given mobile number: " + mobileNumber);
         }
 
-        Customer savedCustomer = customerRepository.save(customer);
-//        Account newAccount = createNewAccount(savedCustomer, accountType);
-        Accounts savedAccount = accountsRepository.save(createNewAccount(savedCustomer, accountType));
+        Accounts savedAccount = accountsRepository.save(createNewAccount(mobileNumber,accountType));
         log.info("✅ Account created with Account ID...: {}", savedAccount.getAccountId());
-        // Send communication regarding the new account
 
+        // Send communication regarding the new account
         // 🔥 Ensure accountId is NOT null before sending Kafka message
-        if (savedAccount.getAccountId() == null) {
-            throw new IllegalStateException("Account ID is null after save! Cannot send Kafka message.");
-        }
-        boolean isSent =false;
-        if (savedAccount.getAccountId() != null) {
-        isSent = kafkaProducerService.sendCommunication(savedAccount, savedCustomer);
-        }else
-        {
-            log.warn("⚠️ Account ID is null after save! Cannot send Kafka message.");
-        }
-        if (!isSent) {
-            log.warn("⚠️ Communication request failed for Account ID: {}", savedAccount.getAccountId());
-        }
+//        if (savedAccount.getAccountId() == null) {
+//            throw new IllegalStateException("Account ID is null after save! Cannot send Kafka message.");
+//        }
+//        boolean isSent =false;
+//        if (savedAccount.getAccountId() != null) {
+//        isSent = kafkaProducerService.sendCommunication(savedAccount, savedAccount);
+//        }else
+//        {
+//            log.warn("⚠️ Account ID is null after save! Cannot send Kafka message.");
+//        }
+//        if (!isSent) {
+//            log.warn("⚠️ Communication request failed for Account ID: {}", savedAccount.getAccountId());
+//        }
 //        kafkaProducerService.sendCommunication(savedAccount, savedCustomer);
     }
 
@@ -83,7 +74,7 @@ public class AccountsServiceImpl implements IAccountsService {
         };
     }
 
-    private Accounts createNewAccount(Customer customer, AccountType accountType) {
+    private Accounts createNewAccount(String mobileNumber, AccountType accountType) {
         Accounts newAccount = new Accounts();
 
         // Generate a random account number
@@ -91,6 +82,7 @@ public class AccountsServiceImpl implements IAccountsService {
         newAccount.setAccountNumber(randomAccountNumber);
         newAccount.setBalance(BigDecimal.TEN);
         newAccount.setBranchAddress(AccountsConstants.ADDRESS);
+        newAccount.setActiveSw(AccountsConstants.ACTIVE_SW);
 
         // Determine account status based on the account type
         switch (accountType) {
@@ -107,12 +99,6 @@ public class AccountsServiceImpl implements IAccountsService {
         AccountCategory category = determineCategoryForAccount(accountType);
         newAccount.setAccountCategory(category);
         newAccount.setAccountType(accountType);
-        // Assign the customer to the new account
-        newAccount.setCustomer(customer);
-
-        // Add account to customer's accounts list
-        customer.addAccount(newAccount);
-
         return newAccount;
     }
 
@@ -148,39 +134,25 @@ public class AccountsServiceImpl implements IAccountsService {
     }
 
     @Override
-    public CustomerDto fetchAccount(String mobileNumber) {
-        // Fetch the Customer by mobile number, throw exception if not found
-        Customer customer = customerRepository.findByMobileNumber(mobileNumber).orElseThrow(
-                () -> new ResourceNotFoundException("Customer", "Mobile Number", mobileNumber)
-        );
-
-        // Fetch the associated Account by the customer's ID, throw exception if not found
-        Accounts account = accountsRepository.findByCustomerId(customer.getId()).orElseThrow(
-                () -> new ResourceNotFoundException("Account", "Customer ID", customer.getId().toString())
-        );
-
-        // Map the Customer entity to a CustomerDto
-//        CustomerDto customerDto = CustomerMapper.mapToCustomerDto(customer, new CustomerDto());
-        CustomerDto customerDto = CustomerMapper.mapToCustomerDto(customer);
-        // Map the Account entity to an AccountsDto and set it in the CustomerDto
-        customerDto.setAccountsDto(AccountsMapper.mapToAccountsDto(account));
-
-        return customerDto;
+    public AccountsDto fetchAccount(String mobileNumber) {
+        // Fetch the account by the mobile number, throw exception if not found
+        Accounts account = accountsRepository.findByMobileNumberAndActiveSw(mobileNumber,AccountsConstants.ACTIVE_SW)
+                .orElseThrow(() -> new ResourceNotFoundException("Account", "Mobile Number", mobileNumber));
+        // Map the Account entity to an AccountsDto
+        return AccountsMapper.mapToAccountsDto(account,new AccountsDto());
     }
 
     @Override
-    public boolean updateAccount(CustomerDto customerDto) {
+    public boolean updateAccount(AccountsDto accountsDto) {
         boolean isUpdated = false;
-        AccountsDto accountsDto = customerDto.getAccountsDto();
 
         if (accountsDto != null) {
             // Log account number from payload
             System.out.println("Account Number from Payload: " + accountsDto.getAccountNumber());
 
             // Fetch the account by account number (using a custom query)
-            Accounts existingAccount = accountsRepository.findByAccountNumber(accountsDto.getAccountNumber()).orElseThrow(
-                    () -> new ResourceNotFoundException("Account", "AccountNumber", accountsDto.getAccountNumber().toString())
-            );
+            Accounts existingAccount = accountsRepository.findByMobileNumberAndActiveSw(accountsDto.getMobileNumber(),AccountsConstants.ACTIVE_SW)
+                    .orElseThrow(() -> new ResourceNotFoundException("Account", "Mobile Number",accountsDto.getMobileNumber()));
 
             // Log account number from the database
             System.out.println("Account Number from Database: " + existingAccount.getAccountNumber());
@@ -193,42 +165,21 @@ public class AccountsServiceImpl implements IAccountsService {
             // Update the account entity
             AccountsMapper.mapToAccounts(accountsDto, existingAccount);
             accountsRepository.save(existingAccount);
-
-            // Fetch customer details using the account's customer ID
-            Long customerId = existingAccount.getCustomer().getId();
-            Customer customer = customerRepository.findById(customerId).orElseThrow(
-                    () -> new ResourceNotFoundException("Customer", "CustomerID", customerId.toString())
-            );
-
-            // Update customer data and save
-            CustomerMapper.mapToCustomer(customerDto, customer);
-            customerRepository.save(customer);
-
             isUpdated = true;  // Mark update as successful
         }
-
         return isUpdated;
     }
 
     @Override
-    public boolean deleteAccount(String mobileNumber) {
-        // Find the customer by mobile number or throw an exception if not found
-        Customer customer = customerRepository.findByMobileNumber(mobileNumber)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer", "Mobile Number", mobileNumber));
+    public boolean deleteAccount(Long accountNumber) {
 
-        // Find all accounts associated with the customer
-        List<Accounts> accounts = accountsRepository.findAllByCustomerId(customer.getId());
+        Accounts existingAccount = accountsRepository.findById(accountNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Account", "Account Number",accountNumber.toString()));
 
-        // Delete all accounts associated with the customer
-        if (!accounts.isEmpty()) {
-            accountsRepository.deleteAll(accounts);
-        } else {
-            throw new ResourceNotFoundException("Account", "Customer ID", customer.getId().toString());
+        if(existingAccount!=null){
+           existingAccount.setActiveSw(AccountsConstants.IN_ACTIVE_SW);
+           accountsRepository.save(existingAccount);
         }
-
-        // Delete the customer after accounts are deleted
-        customerRepository.deleteById(customer.getId());
-
         return true;  // Return true indicating successful deletion
     }
 
@@ -246,7 +197,7 @@ public class AccountsServiceImpl implements IAccountsService {
                                 "Account", "Account ID", accountId.toString()));
 
                 // Update communication status
-                account.setCommunicationSw(true);
+                account.setActiveSw(true);
                 accountsRepository.save(account);
 
                 log.info("✅ Communication status updated successfully for Account ID: {}", accountId);

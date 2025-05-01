@@ -2,10 +2,7 @@ package com.RewaBank.accounts.controller;
 
 import com.RewaBank.accounts.Utility.AccountType;
 import com.RewaBank.accounts.constants.AccountsConstants;
-import com.RewaBank.accounts.dto.AccountsContactInfoDto;
-import com.RewaBank.accounts.dto.CustomerDto;
-import com.RewaBank.accounts.dto.ErrorResponseDto;
-import com.RewaBank.accounts.dto.ResponseDto;
+import com.RewaBank.accounts.dto.*;
 import com.RewaBank.accounts.services.IAccountsService;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -54,7 +51,6 @@ public class AccountsController {
     @Value("${build.version}")
     private String buildVersion;
 
-
     @Operation(
             summary = "create Accounts Rest Api",
             description = "Rest Api to create New Customer And Accounts inside RewaBank"
@@ -75,8 +71,8 @@ public class AccountsController {
     }
     )
     @PostMapping("/create/{accountType}")
-    public ResponseEntity<ResponseDto> createaAccount(@Valid @RequestBody CustomerDto customerDto,@PathVariable("accountType") AccountType accountType){
-      iAccountsService.createAccount(customerDto,accountType);
+    public ResponseEntity<ResponseDto> createaAccount(@Valid @RequestBody String mobileNumber, @PathVariable("accountType") AccountType accountType){
+      iAccountsService.createAccount(mobileNumber,accountType);
       logger.info("Account created successfully");
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -99,18 +95,15 @@ public class AccountsController {
                             schema = @Schema(implementation = ErrorResponseDto.class)
                     )
             )
-
     }
     )
     @GetMapping("/fetch")
-    public ResponseEntity<CustomerDto> fetchAccountDetails(@RequestParam("mobileNumber") @Pattern(regexp = "(^[0-9]{10}$)",
-            message = "Mobile number must be 10 digits") String mobileNumber){
-
-          CustomerDto cutomerDto=iAccountsService.fetchAccount(mobileNumber);
+    public ResponseEntity<AccountsDto> fetchAccountDetails(@RequestParam("mobileNumber") @Pattern(regexp = "(^[0-9]{10}$)",message = "Mobile number must be 10 digits") String mobileNumber){
+          AccountsDto accountsDto=iAccountsService.fetchAccount(mobileNumber);
           logger.info("Account fetched successfully");
-        return ResponseEntity
+          return ResponseEntity
                 .status(HttpStatus.OK)
-                .body(cutomerDto);
+                .body(accountsDto);
     }
     @Operation(
             summary = "Update Accounts details Rest Api",
@@ -134,11 +127,12 @@ public class AccountsController {
             )
             }
     )
+
     @PutMapping("/updateAccount")
-    public ResponseEntity<ResponseDto> updateAccountsDetails(@Valid @RequestBody CustomerDto customerDto) {
+    public ResponseEntity<ResponseDto> updateAccountsDetails(@Valid @RequestBody AccountsDto accountsDto) {
 
         // Call the service layer to update account details
-        boolean isUpdated = iAccountsService.updateAccount(customerDto);
+        boolean isUpdated = iAccountsService.updateAccount(accountsDto);
 
         // Return appropriate response based on the result
         if (isUpdated) {
@@ -147,8 +141,8 @@ public class AccountsController {
                     .body(new ResponseDto(AccountsConstants.STATUS_200, AccountsConstants.MESSAGE_200));
         } else {
             return ResponseEntity
-                    .status(HttpStatus.EXPECTATION_FAILED)
-                    .body(new ResponseDto(AccountsConstants.STATUS_417, AccountsConstants.MESSAGE_417_UPDATE));
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseDto(AccountsConstants.STATUS_500, AccountsConstants.MESSAGE_500_UPDATE));
         }
     }
 
@@ -197,7 +191,6 @@ public class AccountsController {
                     .body(new ResponseDto(AccountsConstants.STATUS_500, AccountsConstants.MESSAGE_500));
         }
     }
-
     @Operation(
             summary = "Delete Accounts details Rest Api",
             description = "Rest Api to delete  Customer & Accounts details based on account number"
@@ -220,12 +213,11 @@ public class AccountsController {
             )
     }
     )
-    @DeleteMapping("/delete")
-    public ResponseEntity<ResponseDto> deleteAccount(@RequestParam("mobileNumber")  @Pattern(regexp = "(^[0-9]{10}$)",
-            message = "mobile number must be 10 digits") String mobileNumber){
-
+    @PatchMapping("/delete")
+    public ResponseEntity<ResponseDto> deleteAccount(@RequestParam("accountNumber")  @Pattern(regexp = "(^[0-9]{10}$)",
+            message = "mobile number must be 10 digits") Long accountNumber){
         logger.debug("delete account method start");
-        boolean isDeleted=iAccountsService.deleteAccount(mobileNumber);
+        boolean isDeleted=iAccountsService.deleteAccount(accountNumber);
         if (isDeleted) {
             logger.debug("delete account method completed");
             return ResponseEntity
@@ -236,8 +228,7 @@ public class AccountsController {
             logger.debug("delete account method has INTERNAL_SERVER_ERROR");
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ResponseDto(AccountsConstants.STATUS_417,AccountsConstants.MESSAGE_417_DELETE));
-
+                    .body(new ResponseDto(AccountsConstants.STATUS_500,AccountsConstants.MESSAGE_500_DELETE));
         }
     }
 
