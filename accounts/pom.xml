@@ -14,6 +14,9 @@
 	<packaging>jar</packaging>
 	<name>accounts</name>
 	<description>Demo project for Spring Boot</description>
+	<properties>
+		<sonar.projectKey>Monukku_BankingMicroserviceApplication_accounts</sonar.projectKey>
+	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
