@@ -11,7 +11,6 @@ import com.RewaBank.accounts.entity.Accounts;
 import com.RewaBank.accounts.exception.ResourceNotFoundException;
 import com.RewaBank.accounts.repository.AccountsRepository;
 import com.RewaBank.accounts.services.IAccountsService;
-//import com.RewaBank.accounts.services.kafka.KafkaProducerService;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

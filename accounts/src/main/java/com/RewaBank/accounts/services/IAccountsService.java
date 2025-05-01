@@ -2,7 +2,6 @@ package com.RewaBank.accounts.services;
 
 import com.RewaBank.accounts.Utility.AccountType;
 import com.RewaBank.accounts.dto.AccountsDto;
-import com.RewaBank.accounts.dto.CustomerDto;
 import com.RewaBank.accounts.entity.Accounts;
 import java.util.List;
 
