@@ -15,7 +15,8 @@
 	<name>accounts</name>
 	<description>Demo project for Spring Boot</description>
 	<properties>
-		<sonar.projectKey>monukku</sonar.projectKey>
+		<sonar.organization>rewabank-accounts</sonar.organization>
+		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
 	</properties>
 	<dependencies>
 		<dependency>
