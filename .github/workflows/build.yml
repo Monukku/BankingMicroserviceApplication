@@ -41,6 +41,7 @@ jobs:
             echo "Building and analyzing $service"
             cd $service
             mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-              -Dsonar.projectKey=Monukku_BankingMicroserviceApplication_$service
+            -Dsonar.projectKey=monukku_$service \
+            -Dsonar.branch.name=main
             cd ..
           done
