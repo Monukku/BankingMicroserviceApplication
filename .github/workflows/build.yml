@@ -1,42 +1,35 @@
-name: SonarQube
+name: SonarQube Multi-Service Analysis
+
 on:
   push:
     branches:
       - main
   pull_request:
     types: [opened, synchronize, reopened]
+
 jobs:
-  build:
-    name: Build and analyze all microservices
+  analyze:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Disable shallow clones for better analysis relevance
-      - name: Set up JDK 17
+          fetch-depth: 0
+
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           java-version: 17
-          distribution: 'zulu' # Alternative distributions are available
-      - name: Cache SonarQube packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
+          distribution: 'zulu'
+
       - name: Cache Maven packages
         uses: actions/cache@v4
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
-      - name: Build and analyze microservices
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          # List of microservice directories
-          services=("accounts" "loans" "cards" "configserver" "customers" "apigateway" "discoveryserver")
 
+<<<<<<< HEAD
           for service in "${services[@]}"; do
             echo "Building and analyzing $service"
             cd $service
@@ -45,3 +38,22 @@ jobs:
             -Dsonar.branch.name=main
             cd ..
           done
+=======
+      - name: Analyze Accounts Service
+        run: mvn -f accounts/pom.xml clean verify sonar:sonar \
+          -Dsonar.projectKey=rewabank_accounts \
+          -Dsonar.projectName="Accounts Service" \
+          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+      - name: Analyze Loans Service
+        run: mvn -f loans/pom.xml clean verify sonar:sonar \
+          -Dsonar.projectKey=rewabank_loans \
+          -Dsonar.projectName="Loans Service" \
+          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+      - name: Analyze Cards Service
+        run: mvn -f cards/pom.xml clean verify sonar:sonar \
+          -Dsonar.projectKey=rewabank_cards \
+          -Dsonar.projectName="Cards Service" \
+          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+>>>>>>> f9f252f (chanes)
