@@ -15,7 +15,7 @@
 	<name>accounts</name>
 	<description>Demo project for Spring Boot</description>
 	<properties>
-		<sonar.projectKey>Monukku_BankingMicroserviceApplication_accounts</sonar.projectKey>
+		<sonar.projectKey>monukku</sonar.projectKey>
 	</properties>
 	<dependencies>
 		<dependency>
