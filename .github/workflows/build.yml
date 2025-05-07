@@ -22,38 +22,27 @@ jobs:
           java-version: 17
           distribution: 'zulu'
 
-      - name: Cache Maven packages
+      - name: Cache Maven
         uses: actions/cache@v4
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
-<<<<<<< HEAD
-          for service in "${services[@]}"; do
-            echo "Building and analyzing $service"
-            cd $service
-            mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-            -Dsonar.projectKey=monukku\
-            -Dsonar.branch.name=main
-            cd ..
-          done
-=======
-      - name: Analyze Accounts Service
-        run: mvn -f accounts/pom.xml clean verify sonar:sonar \
+      - name: Analyze Accounts
+        run: mvn -f accounts/pom.xml verify sonar:sonar \
           -Dsonar.projectKey=rewabank_accounts \
           -Dsonar.projectName="Accounts Service" \
           -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
-      - name: Analyze Loans Service
-        run: mvn -f loans/pom.xml clean verify sonar:sonar \
+      - name: Analyze Loans
+        run: mvn -f loans/pom.xml verify sonar:sonar \
           -Dsonar.projectKey=rewabank_loans \
           -Dsonar.projectName="Loans Service" \
           -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
-      - name: Analyze Cards Service
-        run: mvn -f cards/pom.xml clean verify sonar:sonar \
+      - name: Analyze Cards
+        run: mvn -f cards/pom.xml verify sonar:sonar \
           -Dsonar.projectKey=rewabank_cards \
           -Dsonar.projectName="Cards Service" \
           -Dsonar.login=${{ secrets.SONAR_TOKEN }}
->>>>>>> f9f252f (chanes)
