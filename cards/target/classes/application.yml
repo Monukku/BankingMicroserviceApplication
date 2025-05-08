@@ -24,6 +24,10 @@ spring:
     username: "guest"
     password: "guest"
 
+axon:
+  axonserver:
+    servers: localhost:8124
+
 eureka:
   instance:
     preferIpAddress: true
