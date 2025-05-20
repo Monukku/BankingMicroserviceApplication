@@ -100,6 +100,10 @@ public class Accounts extends BaseEntity {
     @Column(name = "account_Id")
     private Long accountId;
 
+    @Column
+    @NotNull
+    private String mobileNumber;
+
     @NotNull
     @Column(unique = true)
     private Long accountNumber;

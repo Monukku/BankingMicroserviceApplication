@@ -3,6 +3,7 @@ package com.RewaBank.accounts.services.serviceImpl;
 import com.RewaBank.accounts.Utility.AccountCategory;
 import com.RewaBank.accounts.Utility.AccountStatus;
 import com.RewaBank.accounts.Utility.AccountType;
+import com.RewaBank.accounts.command.event.AccountUpdatedEvent;
 import com.RewaBank.accounts.exception.AccountAlreadyExistsException;
 import com.RewaBank.accounts.mapper.AccountsMapper;
 import com.RewaBank.accounts.constants.AccountsConstants;
@@ -12,19 +13,17 @@ import com.RewaBank.accounts.exception.ResourceNotFoundException;
 import com.RewaBank.accounts.repository.AccountsRepository;
 import com.RewaBank.accounts.services.IAccountsService;
 import jakarta.transaction.Transactional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
 @Transactional
 @Service
+@Slf4j
 public class AccountsServiceImpl implements IAccountsService {
 
-    private static final Logger log = LoggerFactory.getLogger(AccountsServiceImpl.class);
     private final AccountsRepository accountsRepository;
 //    private final KafkaProducerService kafkaProducerService;
     public AccountsServiceImpl(AccountsRepository accountsRepository) {
@@ -33,37 +32,18 @@ public class AccountsServiceImpl implements IAccountsService {
     }
 
     @Override
-    public void createAccount(String mobileNumber,AccountType accountType) {
+    public void createAccount(Accounts accounts, AccountType accountType) {
 
-
-        // Check if customer already exists
-        Optional<Accounts> optionalAccounts = accountsRepository.findByMobileNumberAndActiveSw(mobileNumber,AccountsConstants.ACTIVE_SW);
+        Optional<Accounts> optionalAccounts = accountsRepository.findByMobileNumberAndActiveSw(accounts.getMobileNumber(),
+                AccountsConstants.ACTIVE_SW);
         if (optionalAccounts.isPresent()) {
-            throw new AccountAlreadyExistsException("Account already exists with the given mobile number: " + mobileNumber);
+            log.info("Account already registered with given mobileNumber message from ServiceImpl layer");
+            throw new AccountAlreadyExistsException("Account already registered with given mobileNumber " + accounts.getMobileNumber());
         }
-
-        Accounts savedAccount = accountsRepository.save(createNewAccount(mobileNumber,accountType));
-        log.info("✅ Account created with Account ID...: {}", savedAccount.getAccountId());
-
-        // Send communication regarding the new account
-        // 🔥 Ensure accountId is NOT null before sending Kafka message
-//        if (savedAccount.getAccountId() == null) {
-//            throw new IllegalStateException("Account ID is null after save! Cannot send Kafka message.");
-//        }
-//        boolean isSent =false;
-//        if (savedAccount.getAccountId() != null) {
-//        isSent = kafkaProducerService.sendCommunication(savedAccount, savedAccount);
-//        }else
-//        {
-//            log.warn("⚠️ Account ID is null after save! Cannot send Kafka message.");
-//        }
-//        if (!isSent) {
-//            log.warn("⚠️ Communication request failed for Account ID: {}", savedAccount.getAccountId());
-//        }
-//        kafkaProducerService.sendCommunication(savedAccount, savedCustomer);
+        accountsRepository.save(accounts);
+        log.info("Account created from message from ServiceImpl layer");
     }
 
-    // Helper method to determine account category based on account type
     private AccountCategory determineCategoryForAccount(AccountType accountType) {
         return switch (accountType) {
             case SAVINGS, CHECKING -> AccountCategory.PERSONAL;
@@ -101,10 +81,10 @@ public class AccountsServiceImpl implements IAccountsService {
         return newAccount;
     }
 
-    @Override
-    public List<Accounts> getAllAccounts() {
-        return accountsRepository.findAll();
-    }
+//    @Override
+//    public List<Accounts> getAllAccounts() {
+//        return accountsRepository.findAll();
+//    }
 
     @Override
     public boolean deactivateAccount(Long accountNumber) {
@@ -112,14 +92,13 @@ public class AccountsServiceImpl implements IAccountsService {
         boolean isDeactivated = false;
 
         // Fetch the account by the mobile number, throw exception if not found
-        Accounts account = accountsRepository.findByAccountNumber(accountNumber)
+        Accounts account = accountsRepository.findByAccountNumberAndActiveSw(accountNumber,AccountsConstants.ACTIVE_SW)
                 .orElseThrow(() -> new ResourceNotFoundException("Account", "Mobile Number", accountNumber.toString()));
 
         // Check if the account is already inactive to avoid redundant operations
         if (account.getAccountStatus() == AccountStatus.INACTIVE) {
             throw new IllegalStateException("Account is already inactive");
         }
-
         // Set the account status to INACTIVE
         account.setAccountStatus(AccountStatus.INACTIVE);
 
@@ -128,7 +107,6 @@ public class AccountsServiceImpl implements IAccountsService {
 
         // Set the deactivation status to true as the operation succeeded
         isDeactivated = true;
-
         return isDeactivated;
     }
 
@@ -142,84 +120,25 @@ public class AccountsServiceImpl implements IAccountsService {
     }
 
     @Override
-    public boolean updateAccount(AccountsDto accountsDto) {
-        boolean isUpdated = false;
-
-        if (accountsDto != null) {
-            // Log account number from payload
-            System.out.println("Account Number from Payload: " + accountsDto.getAccountNumber());
-
-            // Fetch the account by account number (using a custom query)
-            Accounts existingAccount = accountsRepository.findByMobileNumberAndActiveSw(accountsDto.getMobileNumber(),AccountsConstants.ACTIVE_SW)
-                    .orElseThrow(() -> new ResourceNotFoundException("Account", "Mobile Number",accountsDto.getMobileNumber()));
-
-            // Log account number from the database
-            System.out.println("Account Number from Database: " + existingAccount.getAccountNumber());
-
-            // Ensure the account numbers match before updating
-            if (!existingAccount.getAccountNumber().equals(accountsDto.getAccountNumber())) {
-                throw new IllegalArgumentException("Account number mismatch. Cannot update with a different account number.");
-            }
-
-            // Update the account entity
-            AccountsMapper.mapToAccounts(accountsDto, existingAccount);
-            accountsRepository.save(existingAccount);
-            isUpdated = true;  // Mark update as successful
-        }
-        return isUpdated;
+    public boolean updateAccount(AccountUpdatedEvent event) {
+        Accounts account = accountsRepository.findByMobileNumberAndActiveSw(event.getMobileNumber(),
+                AccountsConstants.ACTIVE_SW).orElseThrow(() -> new ResourceNotFoundException("Account", "mobileNumber",
+                event.getMobileNumber()));
+        AccountsMapper.mapEventToAccount(event, account);
+        accountsRepository.save(account);
+        return true;
     }
 
     @Override
     public boolean deleteAccount(Long accountNumber) {
 
-        Accounts existingAccount = accountsRepository.findById(accountNumber)
+        Accounts existingAccount = accountsRepository.findByAccountNumberAndActiveSw(accountNumber,AccountsConstants.ACTIVE_SW)
                 .orElseThrow(() -> new ResourceNotFoundException("Account", "Account Number",accountNumber.toString()));
 
         if(existingAccount!=null){
            existingAccount.setActiveSw(AccountsConstants.IN_ACTIVE_SW);
            accountsRepository.save(existingAccount);
         }
-        return true;  // Return true indicating successful deletion
+        return true;
     }
-
-    @Override
-    public boolean updateCommunicationStatus(Long accountId) {
-        final int MAX_RETRIES = 3;
-        final long RETRY_DELAY_MS = 2000; // 2 seconds delay
-        int retryCount = 0;
-
-        while (retryCount < MAX_RETRIES) {
-            try {
-                // Fetch account details
-                Accounts account = accountsRepository.findByAccountId(accountId)
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                "Account", "Account ID", accountId.toString()));
-
-                // Update communication status
-                account.setActiveSw(true);
-                accountsRepository.save(account);
-
-                log.info("✅ Communication status updated successfully for Account ID: {}", accountId);
-                return true; // Successful update
-            } catch (ResourceNotFoundException e) {
-                retryCount++;
-                log.warn("⚠️ Account not found with Account ID: {}. Retrying... (Attempt {}/{})",
-                        accountId, retryCount, MAX_RETRIES);
-
-                // Delay before retrying
-                try {
-                    Thread.sleep(RETRY_DELAY_MS);
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                    log.error("❌ Retry process interrupted for Account ID: {}", accountId, ex);
-                    return false; // Return false since retrying was interrupted
-                }
-            }
-        }
-
-        // Log failure after max retries
-        log.error("❌ Failed to update communication status after {} retries for Account ID: {}", MAX_RETRIES, accountId);
-        return false; // Return false if all retries failed
-    }
-
 }

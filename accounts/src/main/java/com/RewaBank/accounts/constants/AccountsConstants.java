@@ -1,5 +1,7 @@
 package com.RewaBank.accounts.constants;
 
+import java.math.BigDecimal;
+
 public class AccountsConstants {
         private AccountsConstants() {
                 // restrict instantiation
@@ -20,4 +22,5 @@ public class AccountsConstants {
         public static final  String MESSAGE_409 = "Account deactivation failed. The account might already be deactivated or doesn't exist.";
         public static final  boolean ACTIVE_SW= true;
         public static final boolean IN_ACTIVE_SW = false;
+        public static final BigDecimal BALANCE=BigDecimal.TEN;
 }

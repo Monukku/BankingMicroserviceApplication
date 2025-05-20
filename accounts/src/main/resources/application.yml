@@ -1,8 +1,6 @@
 server:
   port: 8113
 spring:
-  main:
-    allow-bean-definition-overriding: true
   application:
     name: "accounts"
   profiles:
@@ -19,49 +17,17 @@ spring:
     show-sql: true
   config:
     import: "optional:configserver:http://localhost:8000/"
-
   cloud:
     openfeign:
       circuitbreaker:
         enabled: true
-    function:
-      definition: updateCommunication
     stream:
-        default-binder: rabbit
-        bindings:
-          updateCommunication-in-0:
-           binder: kafka
-           destination: communication-sent
-           group: ${spring.application.name}
-           consumer:
-             concurrency: 3  # Number of consumer instances for parallel processing
-             partitioned: true  # Enable partitioning
-             maxAttempts: 5  # Retry up to 5 times before failing
-             backOffInitialInterval: 1000  # Initial retry delay
-             backOffMaxInterval: 10000  # Max retry delay
-          sendCommunication-out-0:
-            binder: kafka
-            destination: send-communication
-            producer:
-              partition-count: 5  # Number of partitions for scalability
-              partitionKeyExpression: headers['accountId']  # Partition by account ID for consistency
-
-        kafka:
-          binder:
-            brokers:
-              - localhost:9092
-            autoAddPartitions: true
-
-
         rabbitmq:
            binder:
             host: "localhost"
             port: 5672
             username: "guest"
             password: "guest"
-
-
-
 eureka:
   instance:
     preferIpAddress: true
@@ -70,11 +36,9 @@ eureka:
     registerWithEureka: true
     serviceUrl:
       defaultZone: "http://localhost:8761/eureka/"
-
 endpoints:
   shutdown:
     enabled: true
-
 management:
   endpoints:
     web:
@@ -119,21 +83,19 @@ resilience4j.circuitBreaker:
       failureRateThreshold: 50
       waitDurationInOpenState: 10000
 
-resilience4j.retry:
-  configs:
-    default:
-      maxAttempts: 3
-      waitDuration: 500
-      enableExponentialBackoff: true
-      exponentialBackoffMultiplier: 2
-      retryExceptions:
-        - java.util.concurrent.TimeoutException
-      ignoreExceptions:
-        - java.lang.NullPointerException
-
 resilience4j.ratelimiter:
   configs:
     default:
       timeoutDuration: 1000
       limitRefreshPeriod: 5000
       limitForPeriod: 1
+
+axon:
+  eventhandling:
+    processors:
+      account-group:
+        mode: subscribing
+  axonserver:
+    servers: localhost:8124
+    enabled: false
+    context: default
