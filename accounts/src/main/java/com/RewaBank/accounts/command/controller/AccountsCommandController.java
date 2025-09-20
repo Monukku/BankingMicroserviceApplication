@@ -74,12 +74,13 @@ public class AccountsCommandController{
     }
     )
     @PostMapping("/create/{accountType}")
-    public ResponseEntity<ResponseDto> createaAccount(@Valid @RequestParam("mobileNumber")
-                                                          @Pattern(regexp = "^\\d{10}$", message = "Mobile number must be exactly 10 digits") String mobileNumber, @PathVariable("accountType") AccountType accountType){
+    public ResponseEntity<ResponseDto> createAccount(@Valid @RequestParam("mobileNumber")
+                      @Pattern(regexp = "^\\d{10}$", message = "Mobile number must be exactly 10 digits")
+                        String mobileNumber, @PathVariable("accountType") AccountType accountType){
                Random random = new Random();
                long randomNumber = 100000000000L + (long)(random.nextDouble() * 900000000000L);
 
-               CreateAccountCommand   createAccountCommand=CreateAccountCommand.builder()
+                CreateAccountCommand   createAccountCommand=CreateAccountCommand.builder()
                 .accountNumber(randomNumber)
                 .mobileNumber(mobileNumber)
                 .branchAddress(AccountsConstants.ADDRESS)
@@ -88,6 +89,7 @@ public class AccountsCommandController{
                 .balance(AccountsConstants.BALANCE)
                                         .accountStatus(AccountStatus.ACTIVE)
                                                 .accountCategory(AccountCategory.DEFAULT).build();
+                log.info("sending account create request from AccountsCommandController");
         commandGateway.sendAndWait(createAccountCommand);
         log.info("Account create command API call from AccountCommandController is completed.");
         return ResponseEntity

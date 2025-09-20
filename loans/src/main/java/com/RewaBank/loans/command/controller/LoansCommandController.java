@@ -1,4 +1,4 @@
-package com.RewaBank.loans.controller;
+package com.RewaBank.loans.command.controller.controller;
 
 
 import com.RewaBank.loans.constants.LoansConstants;
@@ -35,12 +35,12 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping(path = "/api",produces = {MediaType.APPLICATION_JSON_VALUE})
 @Validated
-public class LoansController {
+public class LoansCommandController {
 
-    private static final Logger logger= LoggerFactory.getLogger(LoansController.class);
+    private static final Logger logger= LoggerFactory.getLogger(LoansCommandController.class);
     private final ILoansService iLoansService;
 
-    public LoansController(ILoansService iLoansService) {
+    public LoansCommandController(ILoansService iLoansService) {
         this.iLoansService = iLoansService;
     }
     @Autowired
@@ -98,7 +98,7 @@ public class LoansController {
         })
         @GetMapping("/fetch")
         public ResponseEntity<LoansDto> fetchLoansDetails(@RequestHeader("rewabank-correlation-id") String correlationId,
-                                                         @RequestParam
+                                                         @RequestParam("mobileNumber")
                                                          @Pattern(regexp="(^|[0-9]{10}$)",message = "Mobile number must be 10 digits")
                                                          String mobileNumber) {
             logger.debug("fetch loans details method starts");

@@ -96,17 +96,12 @@ import java.math.BigDecimal;
 public class Accounts extends BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "account_Id")
-    private Long accountId;
+    @Column(name = "account_Number",nullable = false)
+    private Long accountNumber;
 
     @Column
     @NotNull
     private String mobileNumber;
-
-    @NotNull
-    @Column(unique = true)
-    private Long accountNumber;
 
     @NotNull
     private String branchAddress;

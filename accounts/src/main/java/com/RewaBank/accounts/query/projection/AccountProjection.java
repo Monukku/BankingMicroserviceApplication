@@ -24,8 +24,9 @@ public class AccountProjection {
     public void on(AccountCreatedEvent event) {
         Accounts accountEntity = new Accounts();
         BeanUtils.copyProperties(event, accountEntity);
+        log.info("iService.createAccount call from Account Projection EventHandler started...");
         iAccountsService.createAccount(accountEntity,accountEntity.getAccountType());
-        log.info("AccountCreatedEvent from AccountProject EventHandler");
+        log.info("iService.createAccount call from Account Projection EventHandler completed");
     }
 
     @EventHandler

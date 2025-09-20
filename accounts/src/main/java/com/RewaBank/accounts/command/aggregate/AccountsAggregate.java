@@ -9,7 +9,6 @@ import com.RewaBank.accounts.command.UpdateAccountCommand;
 import com.RewaBank.accounts.command.event.AccountCreatedEvent;
 import com.RewaBank.accounts.command.event.AccountDeletedEvent;
 import com.RewaBank.accounts.command.event.AccountUpdatedEvent;
-import jakarta.validation.constraints.Positive;
 import lombok.extern.slf4j.Slf4j;
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
@@ -25,11 +24,11 @@ public class AccountsAggregate {
 
     @AggregateIdentifier
     private Long accountNumber;
+
     private String mobileNumber;
     private  String branchAddress;
     private AccountType accountType;
     private  boolean activeSw;
-    @Positive
     private BigDecimal balance;
     private AccountStatus accountStatus;
     private AccountCategory accountCategory;
@@ -42,7 +41,7 @@ public class AccountsAggregate {
         AccountCreatedEvent accountCreatedEvent=new AccountCreatedEvent();
         BeanUtils.copyProperties(createAccountCommand,accountCreatedEvent);
         AggregateLifecycle.apply(accountCreatedEvent);
-        log.info(" 'CreateAccountCommand' accounts aggregate commandHandler completed");
+        log.info(" 'AccountCreatedEvent' from accounts aggregate commandHandler completed");
     }
 
     @EventSourcingHandler
@@ -55,7 +54,7 @@ public class AccountsAggregate {
         this.balance=accountCreatedEvent.getBalance();
         this.accountStatus=accountCreatedEvent.getAccountStatus();
         this.accountCategory=accountCreatedEvent.getAccountCategory();
-        log.info("'AccountCreatedEvent' accounts aggregate eventSourcingHandler completed");
+        log.info("'AccountCreatedEvent' from accounts aggregate @EventSourcingHandler completed");
     }
 
     @CommandHandler

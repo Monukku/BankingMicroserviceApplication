@@ -16,11 +16,11 @@ public class CreateAccountCommand {
 
     @TargetAggregateIdentifier
     private  Long accountNumber;
+
     private  String mobileNumber;
     private String branchAddress;
     private AccountType accountType;
     private boolean activeSw;
-    @Positive
     private BigDecimal balance;
     private AccountStatus accountStatus;
     private AccountCategory accountCategory;

@@ -22,12 +22,12 @@ spring:
       circuitbreaker:
         enabled: true
     stream:
-        rabbitmq:
-           binder:
-            host: "localhost"
-            port: 5672
-            username: "guest"
-            password: "guest"
+      rabbitmq:
+        binder:
+          host: "localhost"
+          port: 5672
+          username: "guest"
+          password: "guest"
 eureka:
   instance:
     preferIpAddress: true
@@ -36,6 +36,7 @@ eureka:
     registerWithEureka: true
     serviceUrl:
       defaultZone: "http://localhost:8761/eureka/"
+
 endpoints:
   shutdown:
     enabled: true
@@ -68,12 +69,14 @@ info:
       description: "RewaBank accounts Application"
       version: "1.0.0"
 logging:
+  pattern:
+    level: "%5p[${spring.application.name},%X{trace_ID},%X{span_id}]"
+    console: "%green(%d{HH:mm:ss.SSS}) %blue(%-5level) %red([%thread]) %yellow(%logger{15}) - %msg%n"
   level:
     com:
       RewaBank:
         accounts: DEBUG
-  pattern:
-    level: "%5p[${spring.application.name},%X{trace_ID},%X{span_id}]"
+
 #resilency configuration
 resilience4j.circuitBreaker:
   configs:

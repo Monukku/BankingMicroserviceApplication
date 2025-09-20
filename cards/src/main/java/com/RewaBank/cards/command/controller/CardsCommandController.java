@@ -1,4 +1,4 @@
-package com.RewaBank.cards.controller;
+package com.RewaBank.cards.command.controller;
 
 import com.RewaBank.cards.constants.CardsConstants;
 import com.RewaBank.cards.dto.CardsContactInfoDto;
@@ -100,7 +100,7 @@ public class CardsController {
             )
     })
     @GetMapping("/fetch")
-    public ResponseEntity<CardsDto> fetchCardDetails(@RequestHeader("rewabank-correlation-id") String correlationId, @RequestParam
+    public ResponseEntity<CardsDto> fetchCardDetails(@RequestHeader("rewabank-correlation-id") String correlationId, @RequestParam("mobileNumber")
                                                                @Pattern(regexp="(^|[0-9]{10}$)",message = "Mobile number must be 10 digits")
                                                                String mobileNumber) {
 

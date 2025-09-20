@@ -1,6 +1,5 @@
 package com.RewaBank.accounts.services.serviceImpl;
 
-import com.RewaBank.accounts.Utility.AccountCategory;
 import com.RewaBank.accounts.Utility.AccountStatus;
 import com.RewaBank.accounts.Utility.AccountType;
 import com.RewaBank.accounts.command.event.AccountUpdatedEvent;
@@ -15,9 +14,8 @@ import com.RewaBank.accounts.services.IAccountsService;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import java.math.BigDecimal;
 import java.util.Optional;
-import java.util.Random;
+
 
 @Transactional
 @Service
@@ -25,10 +23,8 @@ import java.util.Random;
 public class AccountsServiceImpl implements IAccountsService {
 
     private final AccountsRepository accountsRepository;
-//    private final KafkaProducerService kafkaProducerService;
     public AccountsServiceImpl(AccountsRepository accountsRepository) {
         this.accountsRepository = accountsRepository;
-//        this.kafkaProducerService=kafkaProducerService;
     }
 
     @Override
@@ -41,50 +37,8 @@ public class AccountsServiceImpl implements IAccountsService {
             throw new AccountAlreadyExistsException("Account already registered with given mobileNumber " + accounts.getMobileNumber());
         }
         accountsRepository.save(accounts);
-        log.info("Account created from message from ServiceImpl layer");
+        log.info("Account created successfully from AccountsServiceImpl layer");
     }
-
-    private AccountCategory determineCategoryForAccount(AccountType accountType) {
-        return switch (accountType) {
-            case SAVINGS, CHECKING -> AccountCategory.PERSONAL;
-            case BUSINESS -> AccountCategory.BUSINESS;
-            case JOINT -> AccountCategory.JOINT;
-            default -> AccountCategory.DEFAULT; // Default category if not specified
-        };
-    }
-
-    private Accounts createNewAccount(String mobileNumber, AccountType accountType) {
-        Accounts newAccount = new Accounts();
-
-        // Generate a random account number
-        long randomAccountNumber = 1000000000L + new Random().nextInt(900000000);
-        newAccount.setAccountNumber(randomAccountNumber);
-        newAccount.setBalance(BigDecimal.TEN);
-        newAccount.setBranchAddress(AccountsConstants.ADDRESS);
-        newAccount.setActiveSw(AccountsConstants.ACTIVE_SW);
-
-        // Determine account status based on the account type
-        switch (accountType) {
-            case SAVINGS, CHECKING -> newAccount.setAccountStatus(AccountStatus.ACTIVE);
-            case FIXED_DEPOSIT, CREDIT_CARD -> newAccount.setAccountStatus(AccountStatus.INACTIVE);
-            case RECURRING_DEPOSIT -> newAccount.setAccountStatus(AccountStatus.PENDING);
-            case LOAN -> newAccount.setAccountStatus(AccountStatus.SUSPENDED);
-            case BUSINESS, JOINT ->
-                    newAccount.setAccountStatus(AccountStatus.ACTIVE); // Assuming active for these types
-            default -> throw new IllegalArgumentException("Invalid account type provided");
-        }
-
-        // Set account category based on the account type
-        AccountCategory category = determineCategoryForAccount(accountType);
-        newAccount.setAccountCategory(category);
-        newAccount.setAccountType(accountType);
-        return newAccount;
-    }
-
-//    @Override
-//    public List<Accounts> getAllAccounts() {
-//        return accountsRepository.findAll();
-//    }
 
     @Override
     public boolean deactivateAccount(Long accountNumber) {

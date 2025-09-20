@@ -36,7 +36,7 @@ public class AccountsCommandInterceptor implements MessageDispatchInterceptor<Co
                         .findByMobileNumberAndActiveSw(createAccountCommand.getMobileNumber(), true);
                 if (optionalAccounts.isPresent()) {
                     log.info("exception thrown from Accounts command interceptor");
-                    throw new AccountAlreadyExistsException("Account already created with given mobileNumber :" + createAccountCommand.getMobileNumber());
+      throw new AccountAlreadyExistsException("Account already created with given mobileNumber :" + createAccountCommand.getMobileNumber());
                 }
             }else if (UpdateAccountCommand.class.equals(command.getPayloadType())) {
                     UpdateAccountCommand updateAccountCommand = (UpdateAccountCommand) command.getPayload();
