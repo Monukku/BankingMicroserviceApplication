@@ -1,0 +1,46 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven 3.9.5'
+        jdk 'JDK 17'
+    }
+
+    environment {
+        SONAR_TOKEN = credentials('SONAR_TOKEN')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/Monukku/BankingMicroserviceApplication.git'
+            }
+        }
+        stage('Build') {
+            steps {
+                dir('loans') {
+                    sh 'mvn clean install'
+                }
+            }
+        }
+        stage('SonarCloud Analysis') {
+            steps {
+                dir('loans') {
+                    sh """
+                    mvn sonar:sonar \
+                    -Dsonar.projectKey=rewabank_loans \
+                    -Dsonar.organization=rewabank \
+                    -Dsonar.host.url=https://sonarcloud.io \
+                    -Dsonar.login=$SONAR_TOKEN
+                    """
+                }
+            }
+        }
+        stage('Docker Build') {
+            steps {
+                sh 'docker build -t rewabank/loans:latest loans/'
+            }
+        }
+        // Add deployment or push to DockerHub as needed
+    }
+}

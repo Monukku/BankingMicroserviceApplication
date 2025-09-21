@@ -5,6 +5,6 @@ import lombok.Value;
 @Value
 public class FindCustomerQuery {
     private final String mobileNumber;
-    private final String correlationId;
+//    private final String correlationId;
 
 }

@@ -1,17 +1,19 @@
 package com.RewaBank.loans.services;
 
+import com.RewaBank.loans.Entity.Loans;
+import com.RewaBank.loans.command.event.LoanUpdatedEvent;
 import com.RewaBank.loans.dto.LoansDto;
 
 public interface ILoansService {
 
 
-    void createLoans(String mobileNumber);
+    void createLoans(Loans loans);
 
     LoansDto fetchLoansDetails(String mobileNumber);
 
-    boolean  update(LoansDto loansDto);
+    boolean  updateLoan(LoanUpdatedEvent event);
 
-    boolean  delete(String mobileNumber);
+    boolean  deleteLoan(Long loanNumber);
 
 
 

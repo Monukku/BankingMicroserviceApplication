@@ -1,30 +1,23 @@
 package com.RewaBank.loans.Entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.GenericGenerator;
 
 @Entity
 @Getter
 @Setter
+@ToString
 @AllArgsConstructor
 @NoArgsConstructor
 public class Loans extends BaseEntity{
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO,generator = "native")
-    @GenericGenerator(name= "native",strategy = "native")
-    @Column(name = "loan_id")
-    private Long loanId;
+    @Column(name = "loanNumber")
+    private Long loanNumber;
 
     @Column(name = "Mobile_Number")
     private String mobileNumber;
-
-    @Column(name = "Loan_Number")
-    private String loanNumber;
 
     @Column(name = "Loan_Type")
     private String loanType;
@@ -38,4 +31,6 @@ public class Loans extends BaseEntity{
     @Column(name = "outstanding_Amount")
     private  int outstandingAmount;
 
+    @Column(name = "activeSw")
+    private boolean activeSw;
 }

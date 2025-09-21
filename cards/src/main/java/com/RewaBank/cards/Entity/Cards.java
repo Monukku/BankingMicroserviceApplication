@@ -1,30 +1,22 @@
 package com.RewaBank.cards.Entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import org.hibernate.annotations.GenericGenerator;
+import lombok.*;
 
 @Entity
 @Getter
 @Setter
+@ToString
 @AllArgsConstructor
 @NoArgsConstructor
 public class Cards extends BaseEntity{
 
         @Id
-        @GeneratedValue(strategy = GenerationType.AUTO,generator = "native")
-        @GenericGenerator(name = "native",strategy = "native")
-        @Column(name = "card_Id")
-        private Long cardId;
+        @Column(name = "cardNumber")
+        private Long cardNumber;
 
         @Column(name="mobile_Number")
         private String mobileNumber;
-
-        @Column(name = "card_number")
-        private String cardNumber;
 
         @Column(name = "card_type")
         private String cardType;
@@ -37,5 +29,8 @@ public class Cards extends BaseEntity{
 
         @Column(name="available_Amount")
         private int availableAmount;
+
+        @Column(name = "activeSw")
+        private boolean activeSw;
 
 }

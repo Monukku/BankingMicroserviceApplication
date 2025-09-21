@@ -1,4 +1,22 @@
 package com.RewaBank.cards.command.event;
 
-public class CardsCreatedEvent {
+import lombok.Data;
+
+@Data
+public class CardCreatedEvent {
+
+    private Long cardNumber;
+
+    private String mobileNumber;
+
+    private String cardType;
+
+    private int totalLimit;
+
+    private int amountUsed;
+
+    private int availableAmount;
+
+    private boolean activeSw;
+
 }

@@ -1,6 +1,7 @@
 package com.RewaBank.loans.services.ServiceImpl;
 
 import com.RewaBank.loans.Entity.Loans;
+import com.RewaBank.loans.command.event.LoanUpdatedEvent;
 import com.RewaBank.loans.constants.LoansConstants;
 import com.RewaBank.loans.dto.LoansDto;
 import com.RewaBank.loans.exception.LoanAlreadyExistsException;
@@ -11,7 +12,6 @@ import com.RewaBank.loans.services.ILoansService;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.Optional;
-import java.util.Random;
 
 @Service
 @AllArgsConstructor
@@ -20,34 +20,19 @@ public class LoansServiceImpl  implements ILoansService {
     private LoansRepository loansRepository;
 
     @Override
-    public void createLoans(String mobileNumber) {
-         Optional<Loans> optionalLoans=loansRepository.findByMobileNumber(mobileNumber);
+    public void createLoans(Loans loans) {
+         Optional<Loans> optionalLoans=loansRepository.findByMobileNumberAndActiveSw(loans.getMobileNumber(),LoansConstants.ACTIVE_SW);
 
          if(optionalLoans.isPresent()){
              throw new LoanAlreadyExistsException("Loans with given mobile number already exist");
          }
-          loansRepository.save(createNewLoan(mobileNumber));
-    }
-
-    private Loans createNewLoan(String mobileNumber){
-
-        Loans loan=new Loans();
-        long randomLoanNumber = 100000000000L + new Random().nextInt(900000000);
-
-        loan.setLoanNumber(String.valueOf(randomLoanNumber));
-        loan.setMobileNumber(mobileNumber);
-        loan.setLoanType(LoansConstants.HOME_LOAN);
-        loan.setAmountPaid(0);
-        loan.setOutstandingAmount(LoansConstants.NEW_LOAN_LIMIT);
-        loan.setTotalLoan(LoansConstants.NEW_LOAN_LIMIT);
-
-        return loan;
+          loansRepository.save(loans);
     }
 
     @Override
     public LoansDto fetchLoansDetails(String mobileNumber) {
 
-                Loans  loans= loansRepository.findByMobileNumber(mobileNumber).orElseThrow(
+                Loans  loans= loansRepository.findByMobileNumberAndActiveSw(mobileNumber,LoansConstants.ACTIVE_SW).orElseThrow(
                            ()-> new ResourceNotFoundException("Loans","MobileNumber",mobileNumber)
                    );
 
@@ -55,33 +40,30 @@ public class LoansServiceImpl  implements ILoansService {
     }
 
     @Override
-    public boolean update(LoansDto loansDto) {
+    public boolean updateLoan(LoanUpdatedEvent event) {
          boolean   isUpdated=false;
          if(!isUpdated) {
 
-             Loans loans = loansRepository.findByMobileNumber(loansDto.getMobileNumber()).orElseThrow(
-                     () -> new ResourceNotFoundException("Loans", "Mobile Number", loansDto.getMobileNumber())
+             Loans loans = loansRepository.findByMobileNumberAndActiveSw(event.getMobileNumber(),LoansConstants.ACTIVE_SW).orElseThrow(
+                     () -> new ResourceNotFoundException("Loans", "Mobile Number", event.getMobileNumber())
              );
 
-             LoansMapper.mapToLoans(loansDto,loans);
+             LoansMapper.mapEventToLoans(event,loans);
              loansRepository.save(loans);
-
              isUpdated=true;
          }
         return isUpdated;
     }
 
     @Override
-    public boolean delete(String mobileNumber) {
+    public boolean deleteLoan(Long loanNumber) {
         boolean   isDeleted=false;
-        if(!isDeleted) {
-            Loans loans = loansRepository.findByMobileNumber(mobileNumber).orElseThrow(
-                    () -> new ResourceNotFoundException("Loans", "mobileNumber", mobileNumber)
+            Loans loans = loansRepository.findByLoanNumberAndActiveSw(loanNumber,LoansConstants.ACTIVE_SW).orElseThrow(
+                    () -> new ResourceNotFoundException("Loans", "mobileNumber", loanNumber.toString())
             );
-
-            loansRepository.delete(loans);
+            loans.setActiveSw(LoansConstants.IN_ACTIVE_SW);
+            loansRepository.save(loans);
             isDeleted = true;
-        }
         return isDeleted;
 
     }

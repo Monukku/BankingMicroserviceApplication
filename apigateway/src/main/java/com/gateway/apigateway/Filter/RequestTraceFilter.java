@@ -23,13 +23,13 @@ public class RequestTraceFilter implements GlobalFilter {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
 
         HttpHeaders requestHeaders = exchange.getRequest().getHeaders();
-
+        String correlationId;
         if (isCorrelationIdPresent(requestHeaders)) {
             logger.debug("rewabank-correlation-Id found in RequestTraceFilter:{}", filterUtility.getCorrelationId(requestHeaders));
             filterUtility.getCorrelationId(requestHeaders);
         } else {
 
-            String correlationId = generateCorrelationId();
+            correlationId = generateCorrelationId();
             filterUtility.setCorrelationId(exchange, correlationId);
             logger.debug("rewabank-correlation-Id is generated in RequestTraceFilter:{}", correlationId);
         }

@@ -42,7 +42,7 @@ public class CardsCommandInterceptor implements MessageDispatchInterceptor<Comma
                           throw new CardAlreadyExistsException("Card already created with given mobileNumber :"
                                   + updateCardCommand.getMobileNumber());
                      }
-                    } else if (DeleteCardCommand.class.equals(command.getPayload())) {
+            }else if (DeleteCardCommand.class.equals(command.getPayload())) {
                         DeleteCardCommand deleteCardCommand=(DeleteCardCommand) command.getPayload();
                       Optional<Cards> optionalCards =  cardsRepository.findByCardNumberAndActiveSw(deleteCardCommand.getCardNumber(), CardsConstants.ACTIVE_SW);
                       if (optionalCards.isPresent()){

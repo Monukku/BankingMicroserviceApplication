@@ -1,7 +1,15 @@
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\audit\AuditAwareImpl.java
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\CardsApplication.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\command\aggregate\CardsAggregate.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\command\controller\CardsCommandController.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\command\CreateCardCommand.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\command\DeleteCardCommand.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\command\event\CardCreatedEvent.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\command\event\CardDeletedEvent.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\command\event\CardUpdatedEvent.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\command\intercepter\CardsCommandInterceptor.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\command\UpdateCardCommand.java
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\constants\CardsConstants.java
-C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\controller\CardsController.java
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\dto\CardsContactInfoDto.java
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\dto\CardsDto.java
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\dto\ErrorResponseDto.java
@@ -12,6 +20,10 @@ C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\Re
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\exception\GlobalExceptionHandler.java
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\exception\ResourceNotFoundException.java
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\mapper\CardsMapper.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\query\controller\CardsQueryController.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\query\FindCardQuery.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\query\handler\CardsQueryHandler.java
+C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\query\projection\CardsProjection.java
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\repository\CardsRepository.java
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\service\ICardsService.java
 C:\Users\Monukushw\Downloads\Microservices-27-03-2025\cards\src\main\java\com\RewaBank\cards\service\ServiceImpl\CardsServiceImpl.java

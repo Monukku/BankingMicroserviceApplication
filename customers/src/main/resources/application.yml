@@ -9,16 +9,26 @@ spring:
     url: jdbc:postgresql://localhost:5432/customersdb
     driverClassName: org.postgresql.Driver
     username: postgres
-    password: 7250  # Change this in production!
+    password: 7250
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: update  # Use "validate" in production
+      ddl-auto: update
     show-sql: true
 
   config:
     import: "optional:configserver:http://localhost:8000/"
-
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+    stream:
+      rabbitmq:
+        binder:
+          host: "localhost"
+          port: 5672
+          username: "guest"
+          password: "guest"
 eureka:
   instance:
     preferIpAddress: true
@@ -28,11 +38,30 @@ eureka:
     serviceUrl:
       defaultZone: "http://localhost:8761/eureka/"
 
+endpoints:
+  shutdown:
+    enabled: true
+
 management:
   endpoints:
     web:
       exposure:
         include: "*"
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+
+  endpoint:
+    shutdown:
+      enabled: true
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
   info:
     env:
       enabled: true
@@ -45,8 +74,27 @@ info:
 
 logging:
   pattern:
+    level: "%5p[${spring.application.name},%X{trace_ID},%X{span_id}]"
     console: "%green(%d{HH:mm:ss.SSS}) %blue(%-5level) %red([%thread]) %yellow(%logger{15}) - %msg%n"
+  level:
+    com:
+      RewaBank:
+        cards: DEBUG
 
+resilience4j.circuitBreaker:
+  configs:
+    default:
+      slidingWindowSize: 10
+      permittedNumberOfCallsInHalfOpenState: 2
+      failureRateThreshold: 50
+      waitDurationInOpenState: 10000
+
+resilience4j.ratelimiter:
+  configs:
+    default:
+      timeoutDuration: 1000
+      limitRefreshPeriod: 5000
+      limitForPeriod: 1
 axon:
   eventhandling:
     processors:
@@ -54,3 +102,5 @@ axon:
         mode: subscribing
   axonserver:
     servers: localhost:8124
+    enabled: false
+    context: default

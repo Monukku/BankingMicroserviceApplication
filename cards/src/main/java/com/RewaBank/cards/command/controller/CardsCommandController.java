@@ -1,11 +1,13 @@
 package com.RewaBank.cards.command.controller;
 
+import com.RewaBank.cards.command.CreateCardCommand;
+import com.RewaBank.cards.command.DeleteCardCommand;
+import com.RewaBank.cards.command.UpdateCardCommand;
 import com.RewaBank.cards.constants.CardsConstants;
 import com.RewaBank.cards.dto.CardsContactInfoDto;
 import com.RewaBank.cards.dto.CardsDto;
 import com.RewaBank.cards.dto.ErrorResponseDto;
 import com.RewaBank.cards.dto.ResponseDto;
-import com.RewaBank.cards.service.ICardsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -14,8 +16,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -26,6 +29,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Random;
+
 @Tag(
         name = "CRUD REST APIs for Cards in RewaBank",
         description = "CRUD REST APIs in RewaBank to CREATE, UPDATE, FETCH AND DELETE card details"
@@ -34,15 +39,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping(path = "/api", produces = {MediaType.APPLICATION_JSON_VALUE})
 @Validated
 @RefreshScope
-public class CardsController {
+@Slf4j
+@RequiredArgsConstructor
+public class CardsCommandController {
 
-    private static final Logger logger= LoggerFactory.getLogger(CardsController.class);
-
-    private final ICardsService iCardsService;
-
-    public CardsController(ICardsService iCardsService) {
-        this.iCardsService = iCardsService;
-    }
+    private final CommandGateway commandGateway;
 
     @Autowired
     @Value("${build.version}")
@@ -73,41 +74,21 @@ public class CardsController {
     }
     )
     @PostMapping("/create")
-    public ResponseEntity<ResponseDto> createCard(@Valid @RequestParam
+    public ResponseEntity<ResponseDto> createCard(@Valid @RequestParam(name = "mobileNumber")
                                                       @Pattern(regexp="(^|[0-9]{10}$)",message = "Mobile number must be 10 digits")
                                                       String mobileNumber) {
-        iCardsService.createCard(mobileNumber);
+        long randomCardNumber = 1000000000L + new Random().nextInt(900000000);
+        CreateCardCommand createCommand = CreateCardCommand.builder()
+                        .cardNumber(randomCardNumber).mobileNumber(mobileNumber)
+                        .cardType(CardsConstants.CREDIT_CARD).totalLimit(CardsConstants.NEW_CARD_LIMIT)
+                        .amountUsed(0).availableAmount(CardsConstants.NEW_CARD_LIMIT)
+                        .activeSw(CardsConstants.ACTIVE_SW)
+                        .build();
+
+            commandGateway.sendAndWait(createCommand);
             return ResponseEntity
                     .status(HttpStatus.CREATED)
                     .body(new ResponseDto(CardsConstants.STATUS_201, CardsConstants.MESSAGE_201));
-    }
-
-    @Operation(
-            summary = "Fetch Card Details REST API",
-            description = "REST API to fetch card details based on a mobile number"
-    )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "HTTP Status OK"
-            ),
-            @ApiResponse(
-                    responseCode = "500",
-                    description = "HTTP Status Internal Server Error",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponseDto.class)
-                    )
-            )
-    })
-    @GetMapping("/fetch")
-    public ResponseEntity<CardsDto> fetchCardDetails(@RequestHeader("rewabank-correlation-id") String correlationId, @RequestParam("mobileNumber")
-                                                               @Pattern(regexp="(^|[0-9]{10}$)",message = "Mobile number must be 10 digits")
-                                                               String mobileNumber) {
-
-        logger.debug("fetch cards details method starts");
-        CardsDto cardsDto = iCardsService.fetchCard(mobileNumber);
-        logger.debug("fetch cards details method end");
-        return ResponseEntity.status(HttpStatus.OK).body(cardsDto);
     }
 
     @Operation(
@@ -130,19 +111,21 @@ public class CardsController {
                             schema = @Schema(implementation = ErrorResponseDto.class)
                     )
             )
-        })
+    })
     @PutMapping("/update")
     public ResponseEntity<ResponseDto> updateCardDetails(@Valid @RequestBody CardsDto cardsDto) {
-        boolean isUpdated = iCardsService.updateCard(cardsDto);
-        if(isUpdated) {
+
+        UpdateCardCommand updateCardCommand= UpdateCardCommand.builder()
+                .cardNumber(cardsDto.getCardNumber()).mobileNumber(cardsDto.getMobileNumber())
+                .cardType(CardsConstants.CREDIT_CARD).totalLimit(cardsDto.getTotalLimit())
+                .amountUsed(cardsDto.getAmountUsed()).availableAmount(cardsDto.getAvailableAmount())
+                .activeSw(CardsConstants.ACTIVE_SW)
+                .build();
+
+        commandGateway.sendAndWait(updateCardCommand);
             return ResponseEntity
                     .status(HttpStatus.OK)
                     .body(new ResponseDto(CardsConstants.STATUS_200, CardsConstants.MESSAGE_200));
-        }else{
-            return ResponseEntity
-                    .status(HttpStatus.EXPECTATION_FAILED)
-                    .body(new ResponseDto(CardsConstants.STATUS_417, CardsConstants.MESSAGE_417_UPDATE));
-        }
     }
 
     @Operation(
@@ -166,22 +149,17 @@ public class CardsController {
                     )
             )
     })
-    @DeleteMapping("/delete")
+    @PatchMapping("/delete")
     public ResponseEntity<ResponseDto> deleteCardDetails(@RequestParam
-                                                                @Pattern(regexp="(^|[0-9]{10}$)",message = "Mobile number must be 10 digits")
-                                                                String mobileNumber) {
-        boolean isDeleted = iCardsService.deleteCard(mobileNumber);
-        if(isDeleted) {
+                      @Pattern(regexp="(^|[0-9]{10}$)",message = "Card number must be 10 digits") Long cardNumber) {
+        DeleteCardCommand  deleteCardCommand=DeleteCardCommand.builder()
+                .cardNumber(cardNumber)
+                .activeSw(CardsConstants.IN_ACTIVE_SW)
+                .build();
             return ResponseEntity
                     .status(HttpStatus.OK)
                     .body(new ResponseDto(CardsConstants.STATUS_200, CardsConstants.MESSAGE_200));
-        }else{
-            return ResponseEntity
-                    .status(HttpStatus.EXPECTATION_FAILED)
-                    .body(new ResponseDto(CardsConstants.STATUS_417, CardsConstants.MESSAGE_417_DELETE));
-        }
     }
-
 
     @Operation(
             summary = "Get Build information",
@@ -207,7 +185,6 @@ public class CardsController {
                 .status(HttpStatus.OK)
                 .body(buildVersion);
     }
-
     @Operation(
             summary = "Get Java version",
             description = "Get Java versions details that is installed into cards microservice"
@@ -257,6 +234,4 @@ public class CardsController {
                 .status(HttpStatus.OK)
                 .body(cardsContactInfoDto);
     }
-
-
 }

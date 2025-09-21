@@ -1,0 +1,27 @@
+{
+  "groups": [
+    {
+      "name": "loans",
+      "type": "com.RewaBank.loans.dto.LoansContactInfoDto",
+      "sourceType": "com.RewaBank.loans.dto.LoansContactInfoDto"
+    }
+  ],
+  "properties": [
+    {
+      "name": "loans.contact-details",
+      "type": "java.util.Map<java.lang.String,java.lang.String>",
+      "sourceType": "com.RewaBank.loans.dto.LoansContactInfoDto"
+    },
+    {
+      "name": "loans.message",
+      "type": "java.lang.String",
+      "sourceType": "com.RewaBank.loans.dto.LoansContactInfoDto"
+    },
+    {
+      "name": "loans.on-call-support",
+      "type": "java.util.List<java.lang.String>",
+      "sourceType": "com.RewaBank.loans.dto.LoansContactInfoDto"
+    }
+  ],
+  "hints": []
+}

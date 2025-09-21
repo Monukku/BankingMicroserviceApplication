@@ -2,6 +2,7 @@ package com.rewabank.customer.command;
 
 
 
+import com.rewabank.customer.Utility.Role;
 import lombok.Builder;
 import lombok.Data;
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
@@ -16,6 +17,7 @@ public class CreateCustomerCommand {
 
     @TargetAggregateIdentifier
     private final String customerId;
+    private final Role role;
     private final String name;
     private final String mobileNumber;
     private final String email;

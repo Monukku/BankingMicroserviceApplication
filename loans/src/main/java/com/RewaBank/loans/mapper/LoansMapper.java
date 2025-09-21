@@ -1,6 +1,7 @@
 package com.RewaBank.loans.mapper;
 
 import com.RewaBank.loans.Entity.Loans;
+import com.RewaBank.loans.command.event.LoanUpdatedEvent;
 import com.RewaBank.loans.dto.LoansDto;
 
 public class LoansMapper {
@@ -26,5 +27,13 @@ public class LoansMapper {
             loans.setOutstandingAmount(loansDto.getOutstandingAmount());
 
             return loans;
+    }
+
+    public static Loans mapEventToLoans(LoanUpdatedEvent event,Loans loans){
+        loans.setLoanType(event.getLoanType());
+        loans.setTotalLoan(event.getTotalLoan());
+        loans.setAmountPaid(event.getAmountPaid());
+        loans.setOutstandingAmount(event.getOutstandingAmount());
+        return loans;
     }
 }

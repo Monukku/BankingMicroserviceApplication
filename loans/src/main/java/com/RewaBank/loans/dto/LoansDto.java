@@ -29,7 +29,7 @@ public class LoansDto {
             description = "Loan number for the Loans"
     )
     @NotEmpty(message = "loanNumber should not be empty or null")
-    private String loanNumber;
+    private Long loanNumber;
 
     @Schema(
             description = "Type of the Loan"

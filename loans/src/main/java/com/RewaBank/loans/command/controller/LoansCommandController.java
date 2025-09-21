@@ -1,12 +1,13 @@
-package com.RewaBank.loans.command.controller.controller;
+package com.RewaBank.loans.command.controller;
 
-
+import com.RewaBank.loans.command.CreateLoanCommand;
+import com.RewaBank.loans.command.DeleteLoanCommand;
+import com.RewaBank.loans.command.UpdateLoanCommand;
 import com.RewaBank.loans.constants.LoansConstants;
 import com.RewaBank.loans.dto.ErrorResponseDto;
 import com.RewaBank.loans.dto.LoansContactInfoDto;
 import com.RewaBank.loans.dto.LoansDto;
 import com.RewaBank.loans.dto.ResponseDto;
-import com.RewaBank.loans.services.ILoansService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -15,8 +16,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -26,6 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import java.util.Random;
 
 @Tag(
         name = "CRUD REST APIs for Loans in RewaBank",
@@ -35,14 +38,12 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping(path = "/api",produces = {MediaType.APPLICATION_JSON_VALUE})
 @Validated
+@Slf4j
+@RequiredArgsConstructor
 public class LoansCommandController {
 
-    private static final Logger logger= LoggerFactory.getLogger(LoansCommandController.class);
-    private final ILoansService iLoansService;
+    private final CommandGateway commandGateway;
 
-    public LoansCommandController(ILoansService iLoansService) {
-        this.iLoansService = iLoansService;
-    }
     @Autowired
     private Environment environment;
     @Autowired
@@ -70,41 +71,20 @@ public class LoansCommandController {
         }
         )
         @PostMapping("/create")
-        public ResponseEntity<ResponseDto> createLoans(@Valid @RequestParam
+        public ResponseEntity<ResponseDto> createLoans(@Valid @RequestParam(name = "mobileNumber")
                                                       @Pattern(regexp="(^|[0-9]{10}$)",message = "Mobile number must be 10 digits")
                                                       String mobileNumber) {
-            iLoansService.createLoans(mobileNumber);
+            long randomLoanNumber = 1000000000L + new Random().nextInt(900000000);
+            CreateLoanCommand createLoanCommand=CreateLoanCommand.builder()
+                    .loanNumber(randomLoanNumber).mobileNumber(mobileNumber)
+                    .loanType(LoansConstants.HOME_LOAN).totalLoan(LoansConstants.NEW_LOAN_LIMIT)
+                    .amountPaid(0).outstandingAmount(LoansConstants.NEW_LOAN_LIMIT)
+                    .activeSw(LoansConstants.ACTIVE_SW)
+                    .build();
+            commandGateway.sendAndWait(createLoanCommand);
             return ResponseEntity
                     .status(HttpStatus.CREATED)
                     .body(new ResponseDto(LoansConstants.STATUS_201, LoansConstants.MESSAGE_201));
-        }
-
-        @Operation(
-                summary = "Fetch Loans Details REST API",
-                description = "REST API to fetch Loans details based on a mobile number"
-        )
-        @ApiResponses({
-                @ApiResponse(
-                        responseCode = "200",
-                        description = "HTTP Status OK"
-                ),
-                @ApiResponse(
-                        responseCode = "500",
-                        description = "HTTP Status Internal Server Error",
-                        content = @Content(
-                                schema = @Schema(implementation = ErrorResponseDto.class)
-                        )
-                )
-        })
-        @GetMapping("/fetch")
-        public ResponseEntity<LoansDto> fetchLoansDetails(@RequestHeader("rewabank-correlation-id") String correlationId,
-                                                         @RequestParam("mobileNumber")
-                                                         @Pattern(regexp="(^|[0-9]{10}$)",message = "Mobile number must be 10 digits")
-                                                         String mobileNumber) {
-            logger.debug("fetch loans details method starts");
-            LoansDto loansDto = iLoansService.fetchLoansDetails(mobileNumber);
-            logger.debug("fetch loans details method ends");
-            return ResponseEntity.status(HttpStatus.OK).body(loansDto);
         }
 
         @Operation(
@@ -130,16 +110,17 @@ public class LoansCommandController {
         })
         @PutMapping("/update")
         public ResponseEntity<ResponseDto> updateLoansDetails(@Valid @RequestBody LoansDto loansDto) {
-            boolean isUpdated = iLoansService.update(loansDto);
-            if(isUpdated) {
+
+            UpdateLoanCommand updateLoanCommand=UpdateLoanCommand.builder()
+                    .loanNumber(loansDto.getLoanNumber()).mobileNumber(loansDto.getMobileNumber())
+                    .loanType(LoansConstants.HOME_LOAN).totalLoan(loansDto.getTotalLoan())
+                    .outstandingAmount(loansDto.getOutstandingAmount()).amountPaid(loansDto.getAmountPaid())
+                    .activeSw(LoansConstants.ACTIVE_SW)
+                    .build();
+                commandGateway.sendAndWait(updateLoanCommand);
                 return ResponseEntity
                         .status(HttpStatus.OK)
                         .body(new ResponseDto(LoansConstants.STATUS_200, LoansConstants.MESSAGE_200));
-            }else{
-                return ResponseEntity
-                        .status(HttpStatus.EXPECTATION_FAILED)
-                        .body(new ResponseDto(LoansConstants.STATUS_417, LoansConstants.MESSAGE_417_UPDATE));
-            }
         }
 
         @Operation(
@@ -163,20 +144,17 @@ public class LoansCommandController {
                         )
                 )
         })
-        @DeleteMapping("/delete")
+        @PatchMapping("/delete")
         public ResponseEntity<ResponseDto> deleteLoansDetails(@RequestParam
                                                              @Pattern(regexp="(^|[0-9]{10}$)",message = "Mobile number must be 10 digits")
-                                                             String loansNumber) {
-            boolean isDeleted = iLoansService.delete(loansNumber);
-            if(isDeleted) {
+                                                             Long loansNumber) {
+            DeleteLoanCommand deleteLoanCommand=DeleteLoanCommand.builder()
+                    .loanNumber(loansNumber).activeSw(LoansConstants.IN_ACTIVE_SW)
+                    .build();
+                commandGateway.sendAndWait(deleteLoanCommand);
                 return ResponseEntity
                         .status(HttpStatus.OK)
                         .body(new ResponseDto(LoansConstants.STATUS_200, LoansConstants.MESSAGE_200));
-            }else{
-                return ResponseEntity
-                        .status(HttpStatus.EXPECTATION_FAILED)
-                        .body(new ResponseDto(LoansConstants.STATUS_417, LoansConstants.MESSAGE_417_DELETE));
-            }
         }
 
 
@@ -226,7 +204,7 @@ public class LoansCommandController {
     )
     @GetMapping("/contact-info")
     public ResponseEntity<LoansContactInfoDto> getContactInfo() {
-            logger.debug("invoked loans contact-info api");
+            log.debug("invoked loans contact-info api");
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(loansContactInfoDto);

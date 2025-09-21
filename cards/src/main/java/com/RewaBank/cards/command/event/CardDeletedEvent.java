@@ -1,4 +1,9 @@
 package com.RewaBank.cards.command.event;
 
-public class CardsDeletedEvent {
+import lombok.Data;
+
+@Data
+public class CardDeletedEvent {
+    private boolean activeSw;
+    private Long cardNumber;
 }

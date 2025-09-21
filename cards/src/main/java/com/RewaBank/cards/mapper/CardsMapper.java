@@ -1,12 +1,13 @@
 package com.RewaBank.cards.mapper;
 
 import com.RewaBank.cards.Entity.Cards;
+import com.RewaBank.cards.command.event.CardUpdatedEvent;
 import com.RewaBank.cards.dto.CardsDto;
 
 public class CardsMapper {
     public static Cards mapToCard(CardsDto cardsDto, Cards cards){
 
-        cards.setMobileNumber(cardsDto.getCardNumber());
+        cards.setMobileNumber(cardsDto.getMobileNumber());
         cards.setCardNumber(cardsDto.getCardNumber());
         cards.setCardType(cardsDto.getCardType());
         cards.setTotalLimit(cardsDto.getTotalLimit());
@@ -26,6 +27,14 @@ public class CardsMapper {
 
         return cardsDto;
 
+    }
+
+    public static Cards mapEventToCard(CardUpdatedEvent event,Cards card){
+               card.setCardType(event.getCardType());
+               card.setAmountUsed(event.getAmountUsed());
+               card.setTotalLimit(event.getTotalLimit());
+               card.setAvailableAmount(event.getAvailableAmount());
+               return card;
     }
 
 }

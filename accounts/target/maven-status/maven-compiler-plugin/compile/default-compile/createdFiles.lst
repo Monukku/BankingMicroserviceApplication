@@ -2,7 +2,6 @@ com\RewaBank\accounts\audit\AuditAwareImpl.class
 com\RewaBank\accounts\command\UpdateAccountCommand.class
 com\RewaBank\accounts\exception\GlobalExceptionHandler.class
 com\RewaBank\accounts\exception\AccountAlreadyExistsException.class
-com\RewaBank\accounts\services\serviceImpl\AccountsServiceImpl$1.class
 com\RewaBank\accounts\Utility\AccountStatus.class
 com\RewaBank\accounts\command\aggregate\AccountsAggregate.class
 META-INF\spring-configuration-metadata.json
@@ -20,7 +19,6 @@ com\RewaBank\accounts\dto\ResponseDto.class
 com\RewaBank\accounts\command\event\AccountCreatedEvent.class
 com\RewaBank\accounts\dto\AccountsContactInfoDto.class
 com\RewaBank\accounts\query\controller\AccountsQueryController.class
-com\RewaBank\accounts\dto\CardsDto.class
 com\RewaBank\accounts\entity\Accounts.class
 com\RewaBank\accounts\AccountsApplication.class
 com\RewaBank\accounts\query\handler\AccountsQueryHandler.class
@@ -37,4 +35,3 @@ com\RewaBank\accounts\command\interceptor\AccountsCommandInterceptor.class
 com\RewaBank\accounts\constants\AccountsConstants.class
 com\RewaBank\accounts\repository\AccountsRepository.class
 com\RewaBank\accounts\exception\ResourceNotFoundException.class
-com\RewaBank\accounts\dto\LoansDto.class

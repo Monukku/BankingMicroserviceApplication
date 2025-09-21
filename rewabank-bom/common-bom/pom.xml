@@ -36,7 +36,6 @@
 			<optional>true</optional>
 			<version>${lombok.version}</version>
 		</dependency>
-
 		<dependency>
 			<groupId>org.axonframework</groupId>
 			<artifactId>axon-spring-boot-starter</artifactId>

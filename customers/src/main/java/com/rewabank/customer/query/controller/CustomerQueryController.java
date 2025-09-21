@@ -1,10 +1,9 @@
 package com.rewabank.customer.query.controller;
 
-import com.rewabank.customer.DTO.CustomerDetailsDto;
+
 import com.rewabank.customer.DTO.CustomerDto;
 import com.rewabank.customer.DTO.ErrorResponseDto;
 import com.rewabank.customer.query.FindCustomerQuery;
-import com.rewabank.customer.services.ICustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -24,13 +23,13 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping(path="/api", produces = MediaType.APPLICATION_JSON_VALUE)
-@Validated@RequiredArgsConstructor
+@Validated
+@RequiredArgsConstructor
 public class CustomerQueryController {
 
     private static final Logger logger = LoggerFactory.getLogger(CustomerQueryController.class);
 
     private final QueryGateway queryGateway;
-
     @Operation(
             summary = "Fetch customer details Rest Api",
             description = "Rest Api to fetch  Customer details inside RewaBank"
@@ -50,25 +49,13 @@ public class CustomerQueryController {
 
     }
     )
-    @GetMapping(value = "/fetch")
-    public ResponseEntity<CustomerDto> fetchCustomerDetails(@RequestHeader("rewabank-correlation-id")
-                                                                   String correlationId,
-                                                                   @RequestParam
-                                                                   @Pattern(regexp = "(^[0-9]{10}$)",message = "mobile number must be 10 digits")
-                                                                   String mobileNumber){
-
-        logger.debug("fetch customer details method start");
-
-        FindCustomerQuery query = new FindCustomerQuery(correlationId, mobileNumber);
-
-// Corrected query call with response type
-        CustomerDto customer = queryGateway.query(query, ResponseTypes.instanceOf(CustomerDto.class)).join();
-
-        logger.debug("fetch customer details method end");
-
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(customer);
-
+    @GetMapping("/fetch")
+    public ResponseEntity<CustomerDto> fetchCustomerDetails(@RequestParam("mobileNumber")
+                                                            @Pattern(regexp = "(^$|[0-9]{10})", message = "Mobile number must be 10 digits")
+                                                            String mobileNumber) {
+        FindCustomerQuery findCustomerQuery = new FindCustomerQuery(mobileNumber);
+        CustomerDto customerDto = queryGateway.query(findCustomerQuery, ResponseTypes.instanceOf(CustomerDto.class)).join();
+        return ResponseEntity.status(HttpStatus.OK).body(customerDto);
     }
+
 }

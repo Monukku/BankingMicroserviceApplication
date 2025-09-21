@@ -29,8 +29,6 @@ spec:
                 configMapKeyRef:
                     name: rewabank-configmap
                     key: KEYCLOAK_ADMIN_PASSWORD
-
-
           ports:
             - name: http
               containerPort: 7070

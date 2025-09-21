@@ -3,11 +3,11 @@ package com.rewabank.customer.command.controller;
 import com.rewabank.customer.DTO.CustomerDto;
 import com.rewabank.customer.DTO.ErrorResponseDto;
 import com.rewabank.customer.DTO.ResponseDto;
+import com.rewabank.customer.Utility.Role;
 import com.rewabank.customer.command.CreateCustomerCommand;
 import com.rewabank.customer.command.DeleteCustomerCommand;
 import com.rewabank.customer.command.UpdateCustomerCommand;
 import com.rewabank.customer.constants.CustomerConstants;
-import com.rewabank.customer.services.ICustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,9 +16,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.axonframework.commandhandling.gateway.CommandGateway;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,14 +28,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping(path="/rewabank/customers/api", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(path="/api", produces = MediaType.APPLICATION_JSON_VALUE)
 @Validated
+@RefreshScope
 @RequiredArgsConstructor
+@Slf4j
 public class CustomerCommandController {
 
-    private final ICustomerService iCustomerService;
     private final CommandGateway commandGateway;
-    private static final Logger logger = LoggerFactory.getLogger(CustomerCommandController.class);
 
     @Operation(
             summary = "create Customer Rest Api",
@@ -61,14 +61,15 @@ public class CustomerCommandController {
 
         CreateCustomerCommand createCustomerCommand=CreateCustomerCommand.builder()
         .customerId(UUID.randomUUID().toString())
-        .name(customerDto.getName())
+                .name(customerDto.getName())
         .mobileNumber(customerDto.getMobileNumber())
-        .email(customerDto.getEmail())
-        .activeSw(CustomerConstants.ACTIVE_SW).build();
-
-
+                .role(Role.CUSTOMER)
+                .email(customerDto.getEmail())
+        .activeSw(CustomerConstants.ACTIVE_SW)
+                .build();
+        log.info("Customer create command from CustomerCommandController is started...");
         commandGateway.sendAndWait(createCustomerCommand);
-        logger.info("Account created successfully");
+        log.info("Customer create command  from CustomerCommandController is completed...");
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(new ResponseDto(CustomerConstants.STATUS_201,CustomerConstants.MESSAGE_201));
@@ -105,9 +106,7 @@ public class CustomerCommandController {
                 .mobileNumber(customerDto.getMobileNumber())
                 .email(customerDto.getEmail())
                 .activeSw(CustomerConstants.ACTIVE_SW).build();
-
         commandGateway.sendAndWait( updateCustomerCommand);
-        logger.info("Account updated successfully");
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(new ResponseDto(CustomerConstants.STATUS_200,CustomerConstants.MESSAGE_200));
@@ -139,12 +138,12 @@ public class CustomerCommandController {
     public ResponseEntity<ResponseDto> deleteAccount(@RequestParam("customerId")  @Pattern(regexp = "(^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$)",
             message = "mobile number must be 10 digits") String customerId){
 
-        DeleteCustomerCommand deleteCustomerCommand=DeleteCustomerCommand.builder()
+        DeleteCustomerCommand deleteCustomerCommand= DeleteCustomerCommand.builder()
                         .customerId(customerId)
                                 .activeSw(CustomerConstants.IN_ACTIVE_SW).build();
-        logger.debug("delete account method start");
+         log.debug("delete account method start");
          commandGateway.sendAndWait(deleteCustomerCommand);
-          logger.debug("delete account method completed");
+          log.debug("delete account method completed");
             return ResponseEntity
                     .status(HttpStatus.OK)
                     .body(new ResponseDto(CustomerConstants.STATUS_200,CustomerConstants.MESSAGE_200));

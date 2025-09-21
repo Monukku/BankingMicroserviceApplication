@@ -9,17 +9,24 @@ import com.rewabank.customer.exception.ResourceNotFoundException;
 import com.rewabank.customer.mapper.CustomerMapper;
 import com.rewabank.customer.repository.CustomerRepository;
 import com.rewabank.customer.services.ICustomerService;
-import lombok.AllArgsConstructor;
+import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import java.util.List;
 import java.util.Optional;
 import static com.rewabank.customer.mapper.CustomerMapper.mapEventToCustomer;
 
+@Transactional
 @Service
-@AllArgsConstructor
+@Slf4j
 public class CustomerServiceImpl implements ICustomerService {
 
-    private CustomerRepository customerRepository;
+    private final CustomerRepository customerRepository;
+
+    public CustomerServiceImpl(CustomerRepository customerRepository) {
+        this.customerRepository = customerRepository;
+    }
 
     @Override
     public void createCustomer(Customer customer) {
@@ -28,19 +35,28 @@ public class CustomerServiceImpl implements ICustomerService {
             throw new CustomerAlreadyExistsException("Customer already exists with the given mobile number: " + customer.getMobileNumber());
         }
          customerRepository.save(customer);
+        log.info("Customer created successfully from CustomersServiceImpl layer");
     }
 
     @Override
-    public CustomerDto fetchCustomerDetails(String correlationId, String mobileNumber) {
+    public CustomerDto fetchCustomerDetails(String mobileNumber) {
         Customer customer= customerRepository.findByMobileNumberAndActiveSw (mobileNumber, CustomerConstants.ACTIVE_SW).orElseThrow(
                 () -> new ResourceNotFoundException("Customer","mobileNmber",mobileNumber)
         );
 
-        return CustomerMapper.mapToCustomerDto(customer, new CustomerDto());
+        return CustomerMapper.mapToCustomerDto(customer);
     }
     @Override
-    public List<Customer> getAllCustomers() {
-        return customerRepository.findAll();
+    public Page<CustomerDto> getAllCustomers(String role,Pageable pageable) {
+        Page<Customer> usersPage;
+
+        if (role != null && !role.isEmpty()) {
+            usersPage = customerRepository.findByRole(role, pageable);
+        } else {
+            usersPage = customerRepository.findAll(pageable);
+        }
+        return usersPage.map(CustomerMapper::mapToCustomerDto);
+
     }
 
     @Override

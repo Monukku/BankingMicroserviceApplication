@@ -17,16 +17,17 @@ spring:
     show-sql: true
   config:
     import: "optional:configserver:http://localhost:8000/"
-
-  rabbitmq:
-    host: "localhost"
-    port: 5672
-    username: "guest"
-    password: "guest"
-
-axon:
-  axonserver:
-    servers: localhost:8124
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+    stream:
+      rabbitmq:
+        binder:
+          host: "localhost"
+          port: 5672
+          username: "guest"
+          password: "guest"
 
 eureka:
   instance:
@@ -37,6 +38,9 @@ eureka:
     serviceUrl:
       defaultZone: "http://localhost:8761/eureka/"
 
+endpoints:
+  shutdown:
+    enabled: true
 management:
   endpoints:
      web:
@@ -60,9 +64,6 @@ management:
     env:
       enabled: true
 
-endpoints:
-  shutdown:
-    enabled: true
 info:
   app:
     name:
@@ -75,3 +76,13 @@ logging:
         cards: DEBUG
   pattern:
     level: "%5p[${spring.application.name},%X{trace_ID},%X{span_id}]"
+
+axon:
+  eventhandling:
+    processors:
+      card-group:
+        mode: subscribing
+  axonserver:
+    servers: localhost:8124
+    enabled: false
+    context: default

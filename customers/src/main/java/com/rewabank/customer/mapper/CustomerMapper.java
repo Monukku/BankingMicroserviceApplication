@@ -44,17 +44,20 @@
 
 package com.rewabank.customer.mapper;
 
-
-import com.rewabank.customer.DTO.CustomerDetailsDto;
 import com.rewabank.customer.DTO.CustomerDto;
 import com.rewabank.customer.Entity.Customer;
+import com.rewabank.customer.Utility.Role;
 import com.rewabank.customer.command.event.CustomerUpdatedEvent;
+import org.springframework.data.domain.Page;
 
 public class CustomerMapper {
-    public static CustomerDto mapToCustomerDto(Customer customer, CustomerDto customerDto) {
+    
+    public static CustomerDto mapToCustomerDto(Customer customer) {
+        CustomerDto customerDto=new CustomerDto();
         customerDto.setCustomerId(customer.getCustomerId());
         customerDto.setName(customer.getName());
         customerDto.setEmail(customer.getEmail());
+        customerDto.setRole(customer.getRole());
         customerDto.setMobileNumber(customer.getMobileNumber());
         customerDto.setActiveSw(customer.isActiveSw());
         return customerDto;
@@ -63,6 +66,7 @@ public class CustomerMapper {
     public static Customer mapToCustomer(CustomerDto customerDto, Customer customer) {
         customer.setCustomerId(customerDto.getCustomerId());
         customer.setName(customerDto.getName());
+        customer.setRole(customerDto.getRole());
         customer.setEmail(customerDto.getEmail());
         customer.setMobileNumber(customerDto.getMobileNumber());
         if(customerDto.isActiveSw()) {
@@ -76,6 +80,10 @@ public class CustomerMapper {
         customer.setEmail(customerUpdatedEvent.getEmail());
         return customer;
 
+    }
+
+    public static Page<CustomerDto> mapToCustomerDto(Page<Customer> usersPage) {
+        return usersPage.map(CustomerMapper::mapToCustomerDto);
     }
 }
 

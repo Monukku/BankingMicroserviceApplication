@@ -1,12 +1,11 @@
-package com.RewaBank.cards.command.intercepter;
-
-import com.RewaBank.cards.Entity.Cards;
-import com.RewaBank.cards.command.CreateCardCommand;
-import com.RewaBank.cards.command.DeleteCardCommand;
-import com.RewaBank.cards.command.UpdateCardCommand;
-import com.RewaBank.cards.constants.CardsConstants;
-import com.RewaBank.cards.exception.CardAlreadyExistsException;
-import com.RewaBank.cards.repository.CardsRepository;
+package com.RewaBank.loans.command.intercepter;
+import com.RewaBank.loans.Entity.Loans;
+import com.RewaBank.loans.command.CreateLoanCommand;
+import com.RewaBank.loans.command.DeleteLoanCommand;
+import com.RewaBank.loans.command.UpdateLoanCommand;
+import com.RewaBank.loans.constants.LoansConstants;
+import com.RewaBank.loans.exception.LoanAlreadyExistsException;
+import com.RewaBank.loans.repository.LoansRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.axonframework.commandhandling.CommandMessage;
@@ -20,34 +19,34 @@ import java.util.function.BiFunction;
 @RequiredArgsConstructor
 @Slf4j
 @Component
-public class CardsCommandInterceptor implements MessageDispatchInterceptor<CommandMessage<?>> {
+public class LoansCommandInterceptor implements MessageDispatchInterceptor<CommandMessage<?>> {
 
-    private final CardsRepository cardsRepository;
+    private final LoansRepository loansRepository;
 
     @Nonnull
     @Override
     public BiFunction<Integer, CommandMessage<?>, CommandMessage<?>> handle(@Nonnull List<? extends CommandMessage<?>> messages) {
         return (index,command) -> {
-            if(CreateCardCommand.class.equals(command.getPayload())) {
-                CreateCardCommand createCardCommand = (CreateCardCommand) command.getPayload();
-            Optional<Cards> optionalCards = cardsRepository.findByMobileNumberAndActiveSw(createCardCommand.getMobileNumber(), true);
+            if(CreateLoanCommand.class.equals(command.getPayload())) {
+                CreateLoanCommand createCardCommand = (CreateLoanCommand) command.getPayload();
+            Optional<Loans> optionalCards = loansRepository.findByMobileNumberAndActiveSw(createCardCommand.getMobileNumber(), true);
                 if (optionalCards.isPresent()) {
-                    throw new CardAlreadyExistsException("Card already created with given mobileNumber :"
+                    throw new LoanAlreadyExistsException("Card already created with given mobileNumber :"
                             + createCardCommand.getMobileNumber());
                 }
-            }else if (UpdateCardCommand.class.equals(command.getPayload())){
-              UpdateCardCommand updateCardCommand=(UpdateCardCommand) command.getPayload();
-              Optional<Cards> optionalCards = cardsRepository.findByMobileNumberAndActiveSw(updateCardCommand.getMobileNumber(),true);
+            }else if (UpdateLoanCommand.class.equals(command.getPayload())){
+              UpdateLoanCommand updateCardCommand=(UpdateLoanCommand) command.getPayload();
+              Optional<Loans> optionalCards = loansRepository.findByMobileNumberAndActiveSw(updateCardCommand.getMobileNumber(),true);
                      if (optionalCards.isPresent()){
-                          throw new CardAlreadyExistsException("Card already created with given mobileNumber :"
+                          throw new LoanAlreadyExistsException("Card already created with given mobileNumber :"
                                   + updateCardCommand.getMobileNumber());
                      }
-            }else if (DeleteCardCommand.class.equals(command.getPayload())) {
-                        DeleteCardCommand deleteCardCommand=(DeleteCardCommand) command.getPayload();
-                      Optional<Cards> optionalCards =  cardsRepository.findByCardNumberAndActiveSw(deleteCardCommand.getCardNumber(), CardsConstants.ACTIVE_SW);
+            }else if (DeleteLoanCommand.class.equals(command.getPayload())) {
+                        DeleteLoanCommand deleteCardCommand=(DeleteLoanCommand) command.getPayload();
+                      Optional<Loans> optionalCards =  loansRepository.findByLoanNumberAndActiveSw(deleteCardCommand.getLoanNumber(), LoansConstants.ACTIVE_SW);
                       if (optionalCards.isPresent()){
-                          throw new CardAlreadyExistsException("Card already created with given mobileNumber :"
-                                  + deleteCardCommand.getCardNumber());
+                          throw new LoanAlreadyExistsException("Card already created with given mobileNumber :"
+                                  + deleteCardCommand.getLoanNumber());
                       }
                  }
             return command;
