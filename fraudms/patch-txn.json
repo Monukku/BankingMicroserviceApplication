@@ -1,0 +1,1 @@
+﻿{"data":{"KEYCLOAK_ISSUER_URI":"http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank","KEYCLOAK_JWKS_URI":"http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs"}}

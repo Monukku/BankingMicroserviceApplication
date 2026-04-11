@@ -18,7 +18,7 @@ public class SecurityConfig {
                 .sessionManagement(s -> s
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health",
+                        .requestMatchers("/actuator/health/**", "/actuator/health",
                                 "/actuator/info",
                                 "/actuator/prometheus").permitAll()
                         .anyRequest().authenticated()
@@ -28,3 +28,4 @@ public class SecurityConfig {
         return http.build();
     }
 }
+

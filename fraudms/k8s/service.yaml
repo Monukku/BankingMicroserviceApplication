@@ -1,15 +1,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: auth-service
+  name: fraud-service
   namespace: banking
   labels:
-    app: auth-ms
+    app: fraud-ms
 spec:
   selector:
-    app: auth-ms
+    app: fraud-ms
   ports:
     - name: http
-      port: 8073
-      targetPort: 8073
+      port: 8094
+      targetPort: 8094
   type: ClusterIP

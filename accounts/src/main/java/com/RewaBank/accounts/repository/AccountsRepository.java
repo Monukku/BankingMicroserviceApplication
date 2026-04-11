@@ -1,16 +1,51 @@
-package com.RewaBank.accounts.repository;
+package com.rewabank.accounts.repository;
 
-import com.RewaBank.accounts.entity.Accounts;
+import com.rewabank.accounts.entity.Account;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
-public interface AccountsRepository extends JpaRepository<Accounts,Long> {
+@Repository
+public interface AccountsRepository extends JpaRepository<Account, UUID> {
 
-    public List<Accounts> findAllByCustomerId(Long customerId);
+    Optional<Account> findByIdAndDeletedAtIsNull(UUID id);
 
-    public Optional<Accounts> findByCustomerId(Long customerId);
+    Optional<Account> findByAccountNumberAndDeletedAtIsNull(String accountNumber);
 
-   public Optional<Accounts> findByAccountNumber(Long mobileNumber);
-    public  Optional<Accounts> findByAccountId(Long accountId);
+    List<Account> findByKeycloakUserIdAndDeletedAtIsNull(String keycloakUserId);
+
+    List<Account> findByCustomerIdAndDeletedAtIsNull(UUID customerId);
+
+    // Pessimistic lock for balance updates — prevents race conditions
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Account a WHERE a.id = :id AND a.deletedAt IS NULL")
+    Optional<Account> findByIdForUpdate(UUID id);
+
+    // Dormancy detection — no transaction in 12 months
+    @Query("""
+        SELECT a FROM Account a
+        WHERE a.status = 'ACTIVE'
+        AND a.deletedAt IS NULL
+        AND (a.lastTransactionAt IS NULL
+             OR a.lastTransactionAt < :cutoffDate)
+        """)
+    List<Account> findAccountsForDormancy(LocalDateTime cutoffDate);
+
+    // Find PENDING accounts for a customer — for KYC activation
+    @Query("""
+        SELECT a FROM Account a
+        WHERE a.customerId = :customerId
+        AND a.status = 'PENDING'
+        AND a.deletedAt IS NULL
+        """)
+    List<Account> findPendingByCustomerId(UUID customerId);
+
+    boolean existsByAccountNumberAndDeletedAtIsNull(String accountNumber);
 }

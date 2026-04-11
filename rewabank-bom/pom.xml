@@ -1,69 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
+
+	<!--  Added: Spring Boot as parent — fixes plugin version error -->
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.4.3</version>
+		<relativePath/>
+	</parent>
+
 	<groupId>com.rewabank</groupId>
 	<artifactId>rewabank-bom</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>rewabank-bom</name>
-	<description>common bom for rewabank microservices</description>
 	<packaging>pom</packaging>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
+	<name>rewabank-bom</name>
+	<description>Common BOM for RewaBank microservices</description>
+
 	<properties>
-		<common-lib.version>1.0.0</common-lib.version>
+		<java.version>21</java.version>
+		<maven.compiler.source>21</maven.compiler.source>
+		<maven.compiler.target>21</maven.compiler.target>
+		<common-lib.version>0.0.1-SNAPSHOT</common-lib.version>
 		<spring-boot.version>3.4.3</spring-boot.version>
-		<axon.version>4.11.0</axon.version>
 		<spring-cloud.version>2024.0.1</spring-cloud.version>
-		<lombok.version> 1.18.34</lombok.version>
-		<otel.version>1.32.0</otel.version>
-		<java.version>17</java.version>
-		<maven.compiler.source>17</maven.compiler.source>
-		<maven.compiler.target>17</maven.compiler.target>
-		<postgres.version>42.4.4</postgres.version>
 		<springdoc.version>2.5.0</springdoc.version>
-		<micrometer.version>1.13.3</micrometer.version>
-		<image.tag>latest</image.tag>
-		<guava-version>32.0.1-jre</guava-version>
+		<otel.version>1.43.0</otel.version>
+		<lombok.version>1.18.36</lombok.version>
+		<testcontainers.version>1.19.8</testcontainers.version>
+		<jjwt.version>0.12.3</jjwt.version>
+		<guava.version>33.4.0-jre</guava.version>
 	</properties>
-	<dependencies>
 
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-devtools</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-
-	</dependencies>
+	<!-- ✅ Removed: direct dependencies from BOM (devtools, test) -->
+	<!-- BOM must have NO direct dependencies -->
 
 	<dependencyManagement>
 		<dependencies>
 
-			<dependency>
-				<groupId>org.axonframework</groupId>
-				<artifactId>axon-bom</artifactId>
-				<version>${axon.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-
+			<!-- ── Spring Boot BOM ────────────────────── -->
 			<dependency>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-dependencies</artifactId>
@@ -72,26 +50,20 @@
 				<scope>import</scope>
 			</dependency>
 
+			<!-- ── Spring Cloud BOM ───────────────────── -->
 			<dependency>
-				<groupId>org.projectlombok</groupId>
-				<artifactId>lombok</artifactId>
-				<version>${lombok.version}</version>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
 
+			<!-- ── Testcontainers BOM ─────────────────── -->
 			<dependency>
-				<groupId>org.postgresql</groupId>
-				<artifactId>postgresql</artifactId>
-				<version>${postgres.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-
-			<dependency>
-				<groupId>org.springdoc</groupId>
-				<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-				<version>${springdoc.version}</version>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>${testcontainers.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
@@ -99,29 +71,104 @@
 			<dependency>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-starter-test</artifactId>
-				<version>${spring-doc.version}</version>
-				<type>pom</type>
+				<version>${spring-boot.version}</version>
 				<scope>test</scope>
 			</dependency>
 
+
+			<!-- ── Individual versions ───────────────── -->
+			<!-- ✅ Fixed: removed type=pom scope=import — lombok is a jar -->
 			<dependency>
-				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-dependencies</artifactId>
-				<version>${spring-cloud.version}</version>
-			    <type>pom</type>
-				<scope>import</scope>
+				<groupId>org.projectlombok</groupId>
+				<artifactId>lombok</artifactId>
+				<version>${lombok.version}</version>
 			</dependency>
+
+			<!-- ✅ Fixed: removed type=pom scope=import — springdoc is a jar -->
+			<dependency>
+				<groupId>org.springdoc</groupId>
+				<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+				<version>${springdoc.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.springdoc</groupId>
+				<artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+				<version>${springdoc.version}</version>
+			</dependency>
+
+			<!-- JWT -->
+			<dependency>
+				<groupId>io.jsonwebtoken</groupId>
+				<artifactId>jjwt-api</artifactId>
+				<version>${jjwt.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>io.jsonwebtoken</groupId>
+				<artifactId>jjwt-impl</artifactId>
+				<version>${jjwt.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>io.jsonwebtoken</groupId>
+				<artifactId>jjwt-jackson</artifactId>
+				<version>${jjwt.version}</version>
+			</dependency>
+
+			<!-- Guava -->
+			<dependency>
+				<groupId>com.google.guava</groupId>
+				<artifactId>guava</artifactId>
+				<version>${guava.version}</version>
+			</dependency>
+
+			<!-- ✅ Removed: axon-bom — not in our architecture -->
+			<!-- ✅ Removed: postgresql explicit version — Spring Boot BOM manages it -->
+			<!-- ✅ Removed: spring-boot-starter-test with wrong variable -->
 
 		</dependencies>
 	</dependencyManagement>
 
 	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-		</plugins>
+		<!-- ✅ Fixed: build → pluginManagement so child MS inherit versions -->
+		<pluginManagement>
+			<plugins>
+
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<version>3.13.0</version>
+					<configuration>
+						<release>21</release>
+						<fork>false</fork>
+					</configuration>
+				</plugin>
+
+				<plugin>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-maven-plugin</artifactId>
+					<!-- version inherited from spring-boot-starter-parent -->
+				</plugin>
+				<plugin>
+					<groupId>org.jacoco</groupId>
+					<artifactId>jacoco-maven-plugin</artifactId>
+					<version>0.8.11</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
 	</build>
 
 </project>
+<!--		```-->
+
+<!--		-&#45;&#45;-->
+
+<!--		**Summary of all 9 fixes:**-->
+<!--		```-->
+<!--		1. Added spring-boot-starter-parent    → fixes plugin version error-->
+<!--		2. pluginManagement not plugins        → BOM doesn't run build itself-->
+<!--		3. java.version 17 → 21               → our decided stack-->
+<!--		4. Removed axon-bom                    → not in our architecture-->
+<!--		5. Removed devtools from dependencies  → BOM must have no direct deps-->
+<!--		6. Removed test from dependencies      → same reason-->
+<!--		7. Fixed lombok/postgresql/springdoc   → jar not pom/import-->
+<!--		8. Fixed spring-boot-starter-test typo → wrong variable removed-->
+<!--		9. Removed micrometer/otel versions    → Spring Boot BOM manages these-->

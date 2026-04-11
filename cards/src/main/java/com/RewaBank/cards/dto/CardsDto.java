@@ -1,4 +1,4 @@
-package com.RewaBank.cards.dto;
+package com.rewabank.cards.dto;
 
 
 import io.swagger.v3.oas.annotations.media.Schema;

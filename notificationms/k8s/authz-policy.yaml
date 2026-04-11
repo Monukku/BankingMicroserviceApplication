@@ -1,44 +1,17 @@
+# Notifications MS accepts NO direct HTTP calls
+# Only Kafka events — no AuthorizationPolicy needed for HTTP
+# Monitoring namespace can scrape actuator
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
-  name: accounts-ms-policy
+  name: notifications-ms-policy
   namespace: banking
 spec:
   selector:
     matchLabels:
-      app: accounts-ms
+      app: notifications-ms
   action: ALLOW
   rules:
-    # API Gateway — all account endpoints
-    - from:
-        - source:
-            principals:
-              - "cluster.local/ns/banking/sa/api-gateway-sa"
-      to:
-        - operation:
-            methods: ["GET","POST","PATCH"]
-            paths: ["/api/v1/accounts/*"]
-    # Transactions MS — credit/debit only
-    - from:
-        - source:
-            principals:
-              - "cluster.local/ns/banking/sa/transactions-ms-sa"
-      to:
-        - operation:
-            methods: ["PATCH"]
-            paths:
-              - "/api/v1/accounts/*/credit"
-              - "/api/v1/accounts/*/debit"
-    # Loans MS — disburse credit only
-    - from:
-        - source:
-            principals:
-              - "cluster.local/ns/banking/sa/loans-ms-sa"
-      to:
-        - operation:
-            methods: ["PATCH"]
-            paths: ["/api/v1/accounts/*/credit"]
-    # Monitoring
     - from:
         - source:
             namespaces: ["monitoring"]

@@ -1,4 +1,4 @@
-package com.RewaBank.cards.constants;
+package com.rewabank.cards.constants;
 
 public final class CardsConstants {
 

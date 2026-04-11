@@ -1,6 +1,6 @@
-package com.RewaBank.cards;
+package com.rewabank.cards;
 
-import com.RewaBank.cards.dto.CardsContactInfoDto;
+import com.rewabank.cards.dto.CardsContactInfoDto;
 import io.swagger.v3.oas.annotations.ExternalDocumentation;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Contact;

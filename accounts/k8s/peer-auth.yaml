@@ -1,8 +1,14 @@
-apiVersion: security.istio.io/v1beta1
+﻿apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
-  name: banking-mtls-strict
+  name: accounts-ms-mtls
   namespace: banking
 spec:
+  selector:
+    matchLabels:
+      app: accounts-ms
   mtls:
-    mode: STRICT    # all traffic in banking namespace must be mTLS
+    mode: STRICT
+  portLevelMtls:
+    "8081":
+      mode: PERMISSIVE

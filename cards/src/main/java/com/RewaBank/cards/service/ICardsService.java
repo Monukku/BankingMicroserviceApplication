@@ -1,6 +1,6 @@
-package com.RewaBank.cards.service;
+package com.rewabank.cards.service;
 
-import com.RewaBank.cards.dto.CardsDto;
+import com.rewabank.cards.dto.CardsDto;
 
 public interface ICardsService {
     boolean deleteCard(String mobileNumber);

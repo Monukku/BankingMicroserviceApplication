@@ -1,67 +1,131 @@
+server:
+  port: 8072
+  error:
+    include-message: never       # never expose internal error messages
+    include-stacktrace: never
+
 spring:
   application:
-    name: "gatewayserver"
-  config:
-    import: "optional:configserver:http://localhost:8000/"
+    name: api-gateway
 
-  cloud:
-    gateway:
-      discovery:
-        locator:
-          enabled: true
-          lowerCaseServiceId: true
-#config for gateway response timeout also known as global response timeout.
-      httpclient:
-        connect-timeout: 1000
-        response-timeout: 15s
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      connect-timeout: 2s
-      timeout: 1s
+  # ← CHANGED: removed config.import: configserver
+  # Config comes from K8s ConfigMap mounted at /config/application.yml
 
   security:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: "http://localhost:7070/realms/rewabank-realm/protocol/openid-connect/certs"
+          # ← CHANGED: K8s DNS — keycloak service in keycloak namespace
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak.keycloak.svc.cluster.local:8080/realms/rewabank/protocol/openid-connect/certs}
+          issuer-uri:  ${KEYCLOAK_ISSUER_URI:http://keycloak.keycloak.svc.cluster.local:8080/realms/rewabank}
 
+  data:
+    redis:
+      # ← CHANGED: K8s DNS
+      host: ${REDIS_HOST:redis-service.banking.svc.cluster.local}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}   # injected from K8s Secret
+      connect-timeout: 2s
+      timeout: 1s
+
+  cloud:
+    gateway:
+      # ← REMOVED: discovery.locator (was Eureka) — using explicit K8s DNS routes
+      httpclient:
+        connect-timeout: 1000
+        response-timeout: 15s
+
+# CORS — override per environment via K8s ConfigMap
+cors:
+  allowed-origins:
+    - ${CORS_ORIGIN_WEB:http://localhost:4200}
+    - ${CORS_ORIGIN_MOBILE:http://localhost:3000}
+
+# Resilience4j circuit breakers
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 2
+        register-health-indicator: true
+    instances:
+      # Transactions — fast fail, no retry
+      transactionsCircuitBreaker:
+        base-config: default
+        sliding-window-size: 20
+        failure-rate-threshold: 40
+      # Payments — fast fail, no retry
+      paymentCircuitBreaker:
+        base-config: default
+        sliding-window-size: 20
+        failure-rate-threshold: 40
+      # Fraud — aggressive, 3s timeout
+      fraudCircuitBreaker:
+        base-config: default
+        sliding-window-size: 5
+        failure-rate-threshold: 30
+        wait-duration-in-open-state: 5s
+      # Accounts
+      accountsCircuitBreaker:
+        base-config: default
+      # Auth
+      authCircuitBreaker:
+        base-config: default
+      # Loans
+      loansCircuitBreaker:
+        base-config: default
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 4s
+    instances:
+      fraudCircuitBreaker:
+        timeout-duration: 3s        # ← fraud must respond in 3s
+      transactionsCircuitBreaker:
+        timeout-duration: 10s       # transactions can take longer
+      paymentCircuitBreaker:
+        timeout-duration: 15s       # payments (NEFT/RTGS) can be slower
+
+# Actuator
 management:
   endpoint:
     gateway:
       enabled: true
+    health:
+      show-details: always
+      probes:
+        enabled: true               # liveness + readiness for K8s
   endpoints:
     web:
       exposure:
-        include: "*"
-  info:
-    env:
-      enabled: true
-
+        include: health,info,prometheus,gateway,refresh
   metrics:
     tags:
       application: ${spring.application.name}
-
-info:
-  app:
-    name:
-      description: "RewaBank Gateway Server Application"
-      version: "1.0.0"
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0              # 100% sampling — OTel Collector filters
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
 
 logging:
   level:
-    com:
-      rewabank:
-        gatewayserver: DEBUG
+    com.rewabank: DEBUG
+    org.springframework.cloud.gateway: INFO
+    org.springframework.security: INFO
   pattern:
-    level: "%5p[${spring.application.name},%X{trace_ID},%X{span_id}]"
+    level: "%5p[${spring.application.name},%X{traceId},%X{spanId}]"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{rewabank-correlation-id}] [%X{traceId}] %-5level %logger{36} - %msg%n"
 
-resilience4j.circuitBreaker:
-  configs:
-    default:
-      slidingWindowSize: 10
-      permittedNumberOfCallsInHalfOpenState: 2
-      failureRateThreshold: 50
-      waitDurationInOpenState: 10000
-
+info:
+  app:
+    name: "RewaBank API Gateway"
+    version: "1.0.0"
+    description: "Central entry point for all RewaBank microservices"

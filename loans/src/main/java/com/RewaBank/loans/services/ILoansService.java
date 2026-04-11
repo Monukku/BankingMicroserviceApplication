@@ -1,6 +1,6 @@
-package com.RewaBank.loans.services;
+package com.rewabank.loans.services;
 
-import com.RewaBank.loans.dto.LoansDto;
+import com.rewabank.loans.dto.LoansDto;
 
 public interface ILoansService {
 

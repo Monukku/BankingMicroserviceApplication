@@ -1,70 +1,71 @@
-apiVersion: apps/v1
+﻿apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: api-gateway
+  name: accounts-ms
   namespace: banking
   labels:
-    app: api-gateway
+    app: accounts-ms
     version: v1
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: api-gateway
+      app: accounts-ms
   template:
     metadata:
       labels:
-        app: api-gateway
+        app: accounts-ms
         version: v1
       annotations:
-        sidecar.istio.io/inject: "true"                         # Envoy sidecar injected
+        sidecar.istio.io/inject: "true"
         prometheus.io/scrape: "true"
-        prometheus.io/port: "8072"
-        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port:   "8081"
+        prometheus.io/path:   "/actuator/prometheus"
     spec:
-      serviceAccountName: api-gateway-sa                        # individual ServiceAccount
+      serviceAccountName: accounts-ms-sa
       containers:
-        - name: api-gateway
-          image: YOUR_DOCKERHUB/rewabank-api-gateway:latest
+        - name: accounts-ms
+          image: rewabank/rewabank-accounts-ms:latest
           ports:
-            - containerPort: 8072
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: accounts-ms-config
           env:
-            - name: SPRING_PROFILES_ACTIVE
-              value: "prod"
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: accounts-db-secret
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: accounts-db-secret
+                  key: password
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: redis-secret
                   key: password
-            - name: KEYCLOAK_JWKS_URI
-              value: "http://keycloak.keycloak.svc.cluster.local:8080/realms/rewabank/protocol/openid-connect/certs"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces"
           resources:
             requests:
               memory: "256Mi"
-              cpu: "250m"
+              cpu:    "250m"
             limits:
               memory: "512Mi"
-              cpu: "500m"
+              cpu:    "500m"
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: 8072
-            initialDelaySeconds: 60
+              port: 8081
+            initialDelaySeconds: 120   # was 90 — give more headroom
             periodSeconds: 30
             failureThreshold: 3
+
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: 8072
-            initialDelaySeconds: 30
+              port: 8081
+            initialDelaySeconds: 120   # was 90
             periodSeconds: 10
             failureThreshold: 3
-          volumeMounts:
-            - name: config-volume
-              mountPath: /config
-      volumes:
-        - name: config-volume
-          configMap:
-            name: api-gateway-config

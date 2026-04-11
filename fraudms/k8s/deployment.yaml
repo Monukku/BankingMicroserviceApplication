@@ -1,80 +1,66 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth-ms
+  name: fraud-ms
   namespace: banking
   labels:
-    app: auth-ms
-    version: v1
+    app: fraud-ms
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: auth-ms
+      app: fraud-ms
   template:
     metadata:
       labels:
-        app: auth-ms
-        version: v1
+        app: fraud-ms
       annotations:
         sidecar.istio.io/inject: "true"
         prometheus.io/scrape: "true"
-        prometheus.io/port:   "8073"
+        prometheus.io/port:   "8094"
         prometheus.io/path:   "/actuator/prometheus"
     spec:
-      serviceAccountName: auth-ms-sa
+      serviceAccountName: fraud-ms-sa
       containers:
-        - name: auth-ms
-          image: YOUR_DOCKERHUB/rewabank-auth-ms:latest
+        - name: fraud-ms
+          image: rewabank/rewabank-fraud-ms:latest
           ports:
-            - containerPort: 8073
+            - containerPort: 8094
           envFrom:
             - configMapRef:
-                name: auth-ms-config
+                name: fraud-ms-config
           env:
             - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: auth-db-secret
+                  name: fraud-db-secret
                   key: username
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: auth-db-secret
+                  name: fraud-db-secret
                   key: password
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: redis-secret
                   key: password
-            - name: KEYCLOAK_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: keycloak-ms-secret
-                  key: client-id
-            - name: KEYCLOAK_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: keycloak-ms-secret
-                  key: client-secret
-            - name: OTEL_ENDPOINT
-              value: "http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces"
           resources:
             requests:
               memory: "256Mi"
-              cpu:    "250m"
+              cpu:    "500m"     # CPU priority — must score fast
             limits:
               memory: "512Mi"
-              cpu:    "500m"
+              cpu:    "1000m"
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: 8073
-            initialDelaySeconds: 60
+              port: 8094
+            initialDelaySeconds: 90
             periodSeconds: 30
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: 8073
-            initialDelaySeconds: 30
+              port: 8094
+            initialDelaySeconds: 60
             periodSeconds: 10

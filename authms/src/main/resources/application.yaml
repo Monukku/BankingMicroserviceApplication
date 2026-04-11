@@ -1,0 +1,109 @@
+server:
+  port: 8073
+  error:
+    include-message: never
+    include-stacktrace: never
+
+spring:
+  application:
+    name: auth-ms
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://auth-db.banking.svc.cluster.local:5432/auth_db}
+    username: ${DB_USERNAME:auth_user}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate         # Flyway manages schema — never let JPA alter it
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST:redis-service.banking.svc.cluster.local}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      timeout: 2s
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-service.banking.svc.cluster.local:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all                  # wait for all replicas — banking grade
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 1
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak.keycloak.svc.cluster.local:8080/realms/rewabank/protocol/openid-connect/certs}
+          issuer-uri:  ${KEYCLOAK_ISSUER_URI:http://keycloak.keycloak.svc.cluster.local:8080/realms/rewabank}
+
+keycloak:
+  server-url:    ${KEYCLOAK_URL:http://keycloak.keycloak.svc.cluster.local:8080}
+  realm:         ${KEYCLOAK_REALM:rewabank}
+  client-id:     ${KEYCLOAK_CLIENT_ID:rewabank-ms}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET}   # from K8s Secret
+
+kafka:
+  topics:
+    user-registered: bank.user.registered
+    user-locked:     bank.user.locked
+
+otp:
+  expiry-seconds: 300            # 5 minutes
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
+
+logging:
+  level:
+    com.rewabank: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{rewabank-correlation-id}] [%X{traceId}] %-5level %logger{36} - %msg%n"
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

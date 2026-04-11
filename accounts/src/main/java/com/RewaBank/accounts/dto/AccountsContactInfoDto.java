@@ -1,4 +1,4 @@
-package com.RewaBank.accounts.dto;
+package com.rewabank.accounts.dto;
 
 import lombok.Getter;
 import lombok.Setter;

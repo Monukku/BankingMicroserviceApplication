@@ -1,4 +1,4 @@
-package com.RewaBank.loans.Entity;
+package com.rewabank.loans.Entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

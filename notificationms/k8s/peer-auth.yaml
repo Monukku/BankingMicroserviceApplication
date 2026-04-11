@@ -1,11 +1,11 @@
 apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
-  name: accounts-ms-mtls
+  name: notifications-ms-mtls
   namespace: banking
 spec:
   selector:
     matchLabels:
-      app: accounts-ms
+      app: notifications-ms
   mtls:
     mode: STRICT

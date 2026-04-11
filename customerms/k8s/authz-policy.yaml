@@ -1,33 +1,36 @@
-# deny-all default — nothing can reach api-gateway unless explicitly allowed
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
-  name: api-gateway-deny-all
+  name: customers-ms-policy
   namespace: banking
 spec:
   selector:
     matchLabels:
-      app: api-gateway
-  action: DENY
-  rules:
-    - from:
-        - source:
-            notPrincipals:
-              - "cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"
----
-# allow ingress gateway to reach api-gateway
-apiVersion: security.istio.io/v1beta1
-kind: AuthorizationPolicy
-metadata:
-  name: api-gateway-allow-ingress
-  namespace: banking
-spec:
-  selector:
-    matchLabels:
-      app: api-gateway
+      app: customers-ms
   action: ALLOW
   rules:
+    # API Gateway can call all customer endpoints
     - from:
         - source:
             principals:
-              - "cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"
+              - "cluster.local/ns/banking/sa/api-gateway-sa"
+      to:
+        - operation:
+            methods: ["GET", "POST", "PATCH"]
+            paths: ["/api/v1/customers/*", "/api/v1/kyc/*"]
+    # Accounts MS can only call KYC status endpoint (KYC gate)
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/accounts-ms-sa"
+      to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/api/v1/customers/*/kyc-status"]
+    # Actuator — monitoring
+    - from:
+        - source:
+            namespaces: ["monitoring"]
+      to:
+        - operation:
+            paths: ["/actuator/health", "/actuator/prometheus"]

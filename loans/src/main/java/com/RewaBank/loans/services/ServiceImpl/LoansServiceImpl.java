@@ -1,13 +1,13 @@
-package com.RewaBank.loans.services.ServiceImpl;
+package com.rewabank.loans.services.ServiceImpl;
 
-import com.RewaBank.loans.Entity.Loans;
-import com.RewaBank.loans.constants.LoansConstants;
-import com.RewaBank.loans.dto.LoansDto;
-import com.RewaBank.loans.exception.LoanAlreadyExistsException;
-import com.RewaBank.loans.exception.ResourceNotFoundException;
-import com.RewaBank.loans.mapper.LoansMapper;
-import com.RewaBank.loans.repository.LoansRepository;
-import com.RewaBank.loans.services.ILoansService;
+import com.rewabank.loans.Entity.Loans;
+import com.rewabank.loans.constants.LoansConstants;
+import com.rewabank.loans.dto.LoansDto;
+import com.rewabank.loans.exception.LoanAlreadyExistsException;
+import com.rewabank.loans.exception.ResourceNotFoundException;
+import com.rewabank.loans.mapper.LoansMapper;
+import com.rewabank.loans.repository.LoansRepository;
+import com.rewabank.loans.services.ILoansService;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.Optional;

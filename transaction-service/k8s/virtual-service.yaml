@@ -1,22 +1,20 @@
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: accounts-ms-vs
+  name: transactions-ms-vs
   namespace: banking
 spec:
   hosts:
-    - accounts-service.banking.svc.cluster.local
+    - transactions-service.banking.svc.cluster.local
   http:
     - match:
         - uri:
-            prefix: /api/v1/accounts
-      timeout: 10s
+            prefix: /api/v1/transactions
+      timeout: 30s
       retries:
-        attempts: 2
-        retryOn: gateway-error,reset
-        perTryTimeout: 5s
+        attempts: 0          # ZERO retries — no duplicate debits ever
       route:
         - destination:
-            host: accounts-service.banking.svc.cluster.local
+            host: transactions-service.banking.svc.cluster.local
             port:
-              number: 8081
+              number: 8082

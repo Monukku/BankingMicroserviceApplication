@@ -1,0 +1,62 @@
+server:
+  port: 9010
+  error:
+    include-message: never
+    include-stacktrace: never
+
+spring:
+  application:
+    name: notifications-ms
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://mongodb-service.banking.svc.cluster.local:27017/notifications_db}
+      auto-index-creation: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-service.banking.svc.cluster.local:9092}
+    consumer:
+      group-id: notifications-ms
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
+
+logging:
+  level:
+    com.rewabank: DEBUG
+    org.springframework.kafka: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"

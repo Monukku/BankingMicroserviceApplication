@@ -1,22 +1,28 @@
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: auth-ms-vs
+  name: fraud-ms-vs
   namespace: banking
 spec:
   hosts:
-    - auth-service.banking.svc.cluster.local
+    - fraud-service.banking.svc.cluster.local
   http:
     - match:
         - uri:
-            prefix: /api/v1/auth
-      timeout: 10s
+            prefix: /api/v1/fraud/score
+      timeout: 3s              # hard 3s timeout on score endpoint
       retries:
-        attempts: 2
+        attempts: 1            # 1 retry only on gateway errors
         retryOn: gateway-error,reset
-        perTryTimeout: 5s
+        perTryTimeout: 1.5s
       route:
         - destination:
-            host: auth-service.banking.svc.cluster.local
+            host: fraud-service.banking.svc.cluster.local
             port:
-              number: 8073
+              number: 8094
+    - route:                   # alert management endpoints
+        - destination:
+            host: fraud-service.banking.svc.cluster.local
+            port:
+              number: 8094
+      timeout: 10s

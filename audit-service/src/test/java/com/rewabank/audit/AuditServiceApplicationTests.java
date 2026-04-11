@@ -1,4 +1,4 @@
-package com.rewabank.audit.service;
+package com.rewabank.audit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

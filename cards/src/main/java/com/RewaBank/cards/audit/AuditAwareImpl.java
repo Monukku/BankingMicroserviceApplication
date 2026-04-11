@@ -1,4 +1,4 @@
-package com.RewaBank.cards.audit;
+package com.rewabank.cards.audit;
 
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.stereotype.Component;

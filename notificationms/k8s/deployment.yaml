@@ -1,52 +1,34 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: accounts-ms
+  name: notifications-ms
   namespace: banking
   labels:
-    app: accounts-ms
-    version: v1
+    app: notifications-ms
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: accounts-ms
+      app: notifications-ms
   template:
     metadata:
       labels:
-        app: accounts-ms
-        version: v1
+        app: notifications-ms
       annotations:
         sidecar.istio.io/inject: "true"
         prometheus.io/scrape: "true"
-        prometheus.io/port:   "8081"
+        prometheus.io/port:   "9010"
         prometheus.io/path:   "/actuator/prometheus"
     spec:
-      serviceAccountName: accounts-ms-sa
+      serviceAccountName: notifications-ms-sa
       containers:
-        - name: accounts-ms
-          image: YOUR_DOCKERHUB/rewabank-accounts-ms:latest
+        - name: notifications-ms
+          image: rewabank/rewabank-notifications-ms:latest
           ports:
-            - containerPort: 8081
+            - containerPort: 9010
           envFrom:
             - configMapRef:
-                name: accounts-ms-config
-          env:
-            - name: DB_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: accounts-db-secret
-                  key: username
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: accounts-db-secret
-                  key: password
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: redis-secret
-                  key: password
+                name: notifications-ms-config
           resources:
             requests:
               memory: "256Mi"
@@ -57,12 +39,12 @@ spec:
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: 8081
+              port: 9010
             initialDelaySeconds: 60
             periodSeconds: 30
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: 8081
+              port: 9010
             initialDelaySeconds: 30
             periodSeconds: 10

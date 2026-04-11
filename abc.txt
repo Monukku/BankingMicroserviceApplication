@@ -1,0 +1,47 @@
+postgrePassword: rewabank@2024
+//Ctrl + Alt + Shift + J  for selecting all text want to update
+
+cd ..\kafka
+cd ..
+
+Command for Starting kafka server in kraft mode
+C:\kafka>.\bin\windows\kafka-storage.bat random-uuid
+frSUf18QR-S9dkb0Gcu3aQ
+C:\kafka>.\bin\windows\kafka-storage.bat format -t  2W0lGmdmRECC4-wroLEIKg -c .\config\kraft\server.properties --ignore-formatted
+C:\kafka>.\bin\windows\kafka-server-start.bat .\config\kraft\server.properties
+
+RabbitMQ 4.0.0 using docker image
+C:\Users\Monukushw>docker run -it --rm --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:4.0-management
+2025-03-15 18:52:37.473654+00:00 [notice] <0.45.0> Application syslog exited with reason: stopped
+2025-03-15 18:52:37.485062+00:00 [notice] <0.216.0> Logging: switching to configured handler(s); following messages may not be visible in this log output
+
+cmd for running axonserver in docker:
+docker run -d --name axonserver -p 8024:8024 -p 8124:8124 ^
+  -v "C:\Users\Monukushw\OneDrive\Desktop\axonserver\data":/axonserver/data ^
+  -v "C:\Users\Monukushw\OneDrive\Desktop\axonserver\events":/axonserver/events ^
+  -v "C:\Users\Monukushw\OneDrive\Desktop\axonserver\config":/axonserver/config ^
+  axoniq/axonserver
+
+
+start keycloak using SDK
+C:\keycloak>.\bin\kc.bat start-dev --http-port=7070
+
+steps to create helm chart :
+
+1. install helm -> we can verify using :<helm version> command
+
+2. creating helm chart for accounts 
+
+C:\Users\hp\Downloads\Microservices_11_02_2024\helm\rewabank-services>helm create accounts
+Creating accounts
+
+3. compile helm chart to see dependent helm chart inside chart.yaml folder for accounts
+
+C:\Users\hp\Downloads\Microservices_11_02_2024\helm\rewabank-services\accounts>helm dependencies build
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "kbernetes-dashboard" chart repository
+...Successfully got an update from the "kubernetes-dashboard" chart repository
+...Successfully got an update from the "bitnami" chart repository
+Update Complete. ⎈Happy Helming!⎈
+Saving 1 charts
+Deleting outdated charts

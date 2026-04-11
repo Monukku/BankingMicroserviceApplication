@@ -1,6 +1,6 @@
-package com.RewaBank.cards.repository;
+package com.rewabank.cards.repository;
 
-import com.RewaBank.cards.Entity.Cards;
+import com.rewabank.cards.Entity.Cards;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 

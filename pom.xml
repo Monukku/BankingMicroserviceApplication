@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.rewabank</groupId>
+    <artifactId>rewabank-parent</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>rewabank-parent</name>
+
+    <modules>
+        <module>rewabank-bom</module>
+        <module>rewabank-bom/common-bom</module>
+        <module>accounts</module>
+        <module>cards</module>
+        <module>loans</module>
+        <module>authms</module>
+        <module>customerms</module>
+<!--        <module>audit-service</module>-->
+        <module>transaction-service</module>
+<!--        <module>verification-service</module>-->
+        <module>notificationms</module>
+        <module>apigateway</module>
+    </modules>
+
+</project>

@@ -1,4 +1,4 @@
-package com.RewaBank.loans.constants;
+package com.rewabank.loans.constants;
 
 public final class LoansConstants {
 

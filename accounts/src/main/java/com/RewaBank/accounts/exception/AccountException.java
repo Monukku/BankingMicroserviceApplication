@@ -1,4 +1,12 @@
-package com.RewaBank.accounts.exception;
+package com.rewabank.accounts.exception;
 
-public class AccountException {
+import lombok.Getter;
+
+@Getter
+public class AccountException extends RuntimeException {
+    private final String errorCode;
+    public AccountException(String errorCode, String message) {
+        super(message);
+        this.errorCode = errorCode;
+    }
 }

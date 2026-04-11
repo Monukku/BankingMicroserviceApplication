@@ -1,4 +1,4 @@
-package com.RewaBank.loans;
+package com.rewabank.loans;
 
 import org.springframework.boot.test.context.SpringBootTest;
 

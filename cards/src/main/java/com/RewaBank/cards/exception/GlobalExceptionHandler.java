@@ -1,6 +1,6 @@
-package com.RewaBank.cards.exception;
+package com.rewabank.cards.exception;
 
-import com.RewaBank.cards.dto.ErrorResponseDto;
+import com.rewabank.cards.dto.ErrorResponseDto;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;

@@ -1,6 +1,6 @@
-package com.RewaBank.loans;
+package com.rewabank.loans;
 
-import com.RewaBank.loans.dto.LoansContactInfoDto;
+import com.rewabank.loans.dto.LoansContactInfoDto;
 import io.swagger.v3.oas.annotations.ExternalDocumentation;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Contact;

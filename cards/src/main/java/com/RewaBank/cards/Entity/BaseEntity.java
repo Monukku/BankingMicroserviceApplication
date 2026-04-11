@@ -1,4 +1,4 @@
-package com.RewaBank.cards.Entity;
+package com.rewabank.cards.Entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;

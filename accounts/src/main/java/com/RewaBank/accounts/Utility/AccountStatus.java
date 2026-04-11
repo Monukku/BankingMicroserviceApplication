@@ -1,4 +1,4 @@
-package com.RewaBank.accounts.Utility;
+package com.rewabank.accounts.Utility;
 
 public enum AccountStatus {
     ACTIVE,           // Account is active and operational

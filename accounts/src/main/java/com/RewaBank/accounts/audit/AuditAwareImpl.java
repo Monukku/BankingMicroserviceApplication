@@ -1,4 +1,4 @@
-package com.RewaBank.accounts.audit;
+package com.rewabank.accounts.audit;
 
 
 import org.springframework.data.domain.AuditorAware;

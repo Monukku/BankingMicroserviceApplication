@@ -1,11 +1,11 @@
 apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
-  name: auth-ms-mtls
+  name: fraud-ms-mtls
   namespace: banking
 spec:
   selector:
     matchLabels:
-      app: auth-ms
+      app: fraud-ms
   mtls:
     mode: STRICT

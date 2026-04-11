@@ -1,4 +1,10 @@
-package com.RewaBank.accounts.dto;
+package com.rewabank.accounts.dto;
 
-public class KycStatusResponse {
-}
+// Response from Customers MS KYC gate call
+public record KycStatusResponse(
+        String customerId,
+        String keycloakUserId,
+        String kycStatus,
+        boolean kycVerified,
+        String message
+) {}

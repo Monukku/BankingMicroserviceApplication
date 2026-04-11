@@ -1,12 +1,12 @@
-package com.RewaBank.loans.controller;
+package com.rewabank.loans.controller;
 
 
-import com.RewaBank.loans.constants.LoansConstants;
-import com.RewaBank.loans.dto.ErrorResponseDto;
-import com.RewaBank.loans.dto.LoansContactInfoDto;
-import com.RewaBank.loans.dto.LoansDto;
-import com.RewaBank.loans.dto.ResponseDto;
-import com.RewaBank.loans.services.ILoansService;
+import com.rewabank.loans.constants.LoansConstants;
+import com.rewabank.loans.dto.ErrorResponseDto;
+import com.rewabank.loans.dto.LoansContactInfoDto;
+import com.rewabank.loans.dto.LoansDto;
+import com.rewabank.loans.dto.ResponseDto;
+import com.rewabank.loans.services.ILoansService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;

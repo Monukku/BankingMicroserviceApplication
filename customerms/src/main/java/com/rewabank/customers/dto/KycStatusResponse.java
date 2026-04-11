@@ -1,4 +1,12 @@
-package com.rewabank.customers.DTO;
+package com.rewabank.customers.dto;
 
-public class KycStatusResponse {
-}
+import com.rewabank.customers.entity.Customer;
+
+// Used by Accounts MS KYC gate sync call
+public record KycStatusResponse(
+        String customerId,
+        String keycloakUserId,
+        Customer.KycStatus kycStatus,
+        boolean kycVerified,
+        String message
+) {}

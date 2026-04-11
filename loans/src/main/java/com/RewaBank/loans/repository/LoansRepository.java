@@ -1,6 +1,6 @@
-package com.RewaBank.loans.repository;
+package com.rewabank.loans.repository;
 
-import com.RewaBank.loans.Entity.Loans;
+import com.rewabank.loans.Entity.Loans;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;

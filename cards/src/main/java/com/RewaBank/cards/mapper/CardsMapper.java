@@ -1,7 +1,7 @@
-package com.RewaBank.cards.mapper;
+package com.rewabank.cards.mapper;
 
-import com.RewaBank.cards.Entity.Cards;
-import com.RewaBank.cards.dto.CardsDto;
+import com.rewabank.cards.Entity.Cards;
+import com.rewabank.cards.dto.CardsDto;
 
 public class CardsMapper {
     public static Cards mapToCard(CardsDto cardsDto, Cards cards){

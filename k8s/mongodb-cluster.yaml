@@ -1,0 +1,23 @@
+apiVersion: mongodbcommunity.mongodb.com/v1
+kind: MongoDBCommunity
+metadata:
+  name: mongodb
+  namespace: banking
+spec:
+  members: 1
+  type: ReplicaSet
+  version: "7.0.0"
+  security:
+    authentication:
+      modes: ["SCRAM"]
+  users:
+    - name: root
+      db: admin
+      passwordSecretRef:
+        name: mongodb-secret
+      roles:
+        - name: clusterAdmin
+          db: admin
+        - name: dbAdminAnyDatabase
+          db: admin
+      scramCredentialsSecretName: mongodb-scram

@@ -1,7 +1,7 @@
-package com.RewaBank.loans.mapper;
+package com.rewabank.loans.mapper;
 
-import com.RewaBank.loans.Entity.Loans;
-import com.RewaBank.loans.dto.LoansDto;
+import com.rewabank.loans.Entity.Loans;
+import com.rewabank.loans.dto.LoansDto;
 
 public class LoansMapper {
     public  static LoansDto mapToLoansDto(Loans loans,LoansDto loansDto){

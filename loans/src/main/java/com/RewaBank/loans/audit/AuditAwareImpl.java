@@ -1,4 +1,4 @@
-package com.RewaBank.loans.audit;
+package com.rewabank.loans.audit;
 
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.stereotype.Component;

@@ -1,20 +1,20 @@
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
-  name: accounts-ms-dr
+  name: transactions-ms-dr
   namespace: banking
 spec:
-  host: accounts-service.banking.svc.cluster.local
+  host: transactions-service.banking.svc.cluster.local
   trafficPolicy:
     tls:
       mode: ISTIO_MUTUAL
     connectionPool:
       tcp:
-        maxConnections: 100
+        maxConnections: 200
       http:
-        http2MaxRequests: 1000
-        maxRequestsPerConnection: 10
+        http2MaxRequests: 2000
+        maxRequestsPerConnection: 20
     outlierDetection:
-      consecutiveGatewayErrors: 5
+      consecutiveGatewayErrors: 3
       interval: 10s
       baseEjectionTime: 30s

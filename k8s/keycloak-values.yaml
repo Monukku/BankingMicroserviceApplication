@@ -1,0 +1,36 @@
+﻿command:
+  - "/opt/keycloak/bin/kc.sh"
+  - "start-dev"
+  - "--db=postgres"
+  - "--db-url=jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/keycloak_db?sslmode=verify-ca&sslrootcert=/opt/keycloak/certs/ca.crt"
+extraEnv: |
+  - name: KEYCLOAK_ADMIN
+    value: admin
+  - name: KEYCLOAK_ADMIN_PASSWORD
+    value: "admin@2024"
+  - name: KC_HTTP_RELATIVE_PATH
+    value: /auth
+  - name: KC_DB_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-db-secret
+        key: username
+  - name: KC_DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-db-secret
+        key: password
+extraVolumes: |
+  - name: postgresql-ca
+    secret:
+      secretName: postgresql-ca
+extraVolumeMounts: |
+  - name: postgresql-ca
+    mountPath: /opt/keycloak/certs
+    readOnly: true
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 1Gi

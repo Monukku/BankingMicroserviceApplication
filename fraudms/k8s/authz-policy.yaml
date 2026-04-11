@@ -1,27 +1,54 @@
-# Only API Gateway can call Auth MS
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
-  name: auth-ms-policy
+  name: fraud-ms-policy
   namespace: banking
 spec:
+  action: ALLOW
   selector:
     matchLabels:
-      app: auth-ms
-  action: ALLOW
+      app: fraud-ms
   rules:
+    # Allow kubelet health probes from anywhere (no source restriction)
+    - to:
+        - operation:
+            paths:
+              - /actuator/health
+              - /actuator/health/liveness
+              - /actuator/health/readiness
+
+    # Allow Prometheus scraping from monitoring namespace
+    - from:
+        - source:
+            namespaces:
+              - monitoring
+      to:
+        - operation:
+            paths:
+              - /actuator/prometheus
+
+    # Fraud score — Transactions MS via mTLS only
     - from:
         - source:
             principals:
-              - "cluster.local/ns/banking/sa/api-gateway-sa"
+              - cluster.local/ns/banking/sa/transactions-ms-sa
       to:
         - operation:
-            methods: ["GET", "POST"]
-            paths: ["/api/v1/auth/*"]
+            methods:
+              - GET
+            paths:
+              - /api/v1/fraud/score
+
+    # Alert management — API Gateway only
     - from:
         - source:
             principals:
-              - "cluster.local/ns/banking/sa/api-gateway-sa"
+              - cluster.local/ns/banking/sa/api-gateway-sa
       to:
         - operation:
-            paths: ["/actuator/health", "/actuator/prometheus"]
+            methods:
+              - GET
+              - PATCH
+            paths:
+              - /api/v1/fraud/alerts
+              - /api/v1/fraud/alerts/*

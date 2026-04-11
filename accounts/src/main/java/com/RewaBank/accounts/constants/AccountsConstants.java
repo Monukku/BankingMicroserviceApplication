@@ -1,4 +1,4 @@
-package com.RewaBank.accounts.constants;
+package com.rewabank.accounts.constants;
 
 public class AccountsConstants {
         private AccountsConstants(){

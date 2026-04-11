@@ -1,11 +1,11 @@
-package com.RewaBank.cards.controller;
+package com.rewabank.cards.controller;
 
-import com.RewaBank.cards.constants.CardsConstants;
-import com.RewaBank.cards.dto.CardsContactInfoDto;
-import com.RewaBank.cards.dto.CardsDto;
-import com.RewaBank.cards.dto.ErrorResponseDto;
-import com.RewaBank.cards.dto.ResponseDto;
-import com.RewaBank.cards.service.ICardsService;
+import com.rewabank.cards.constants.CardsConstants;
+import com.rewabank.cards.dto.CardsContactInfoDto;
+import com.rewabank.cards.dto.CardsDto;
+import com.rewabank.cards.dto.ErrorResponseDto;
+import com.rewabank.cards.dto.ResponseDto;
+import com.rewabank.cards.service.ICardsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;

@@ -1,70 +1,83 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: api-gateway
+  name: customers-ms
   namespace: banking
   labels:
-    app: api-gateway
+    app: customers-ms
     version: v1
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: api-gateway
+      app: customers-ms
   template:
     metadata:
       labels:
-        app: api-gateway
+        app: customers-ms
         version: v1
       annotations:
-        sidecar.istio.io/inject: "true"                         # Envoy sidecar injected
+        sidecar.istio.io/inject: "true"
         prometheus.io/scrape: "true"
-        prometheus.io/port: "8072"
-        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port:   "8080"
+        prometheus.io/path:   "/actuator/prometheus"
     spec:
-      serviceAccountName: api-gateway-sa                        # individual ServiceAccount
+      serviceAccountName: customers-ms-sa
       containers:
-        - name: api-gateway
-          image: YOUR_DOCKERHUB/rewabank-api-gateway:latest
+        - name: customers-ms
+          image: rewabank/rewabank-customers-ms:latest
           ports:
-            - containerPort: 8072
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: customers-ms-config
           env:
-            - name: SPRING_PROFILES_ACTIVE
-              value: "prod"
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: customers-db-secret
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: customers-db-secret
+                  key: password
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: redis-secret
                   key: password
-            - name: KEYCLOAK_JWKS_URI
-              value: "http://keycloak.keycloak.svc.cluster.local:8080/realms/rewabank/protocol/openid-connect/certs"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces"
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: secret-key
+            - name: AES_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: encryption-secret
+                  key: aes-key
           resources:
             requests:
               memory: "256Mi"
-              cpu: "250m"
+              cpu:    "250m"
             limits:
               memory: "512Mi"
-              cpu: "500m"
+              cpu:    "500m"
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: 8072
+              port: 8080
             initialDelaySeconds: 60
             periodSeconds: 30
-            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: 8072
+              port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10
-            failureThreshold: 3
-          volumeMounts:
-            - name: config-volume
-              mountPath: /config
-      volumes:
-        - name: config-volume
-          configMap:
-            name: api-gateway-config

@@ -1,4 +1,4 @@
-package com.gateway.apigateway;
+package com.rewabank.gateway;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

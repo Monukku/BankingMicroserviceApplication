@@ -1,0 +1,22 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgresql
+  namespace: banking
+spec:
+  instances: 1
+  storage:
+    size: 5Gi
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 200m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      secret:
+        name: postgresql-secret

@@ -1,0 +1,120 @@
+server:
+  port: 8082
+  error:
+    include-message: never
+    include-stacktrace: never
+
+spring:
+  application:
+    name: transactions-ms
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://transactions-db.banking.svc.cluster.local:5432/transactions_db}
+    username: ${DB_USERNAME:transactions_user}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST:redis-service.banking.svc.cluster.local}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      timeout: 2s
+
+  kafka:
+    topics:
+      initiated: bank.transaction.initiated
+      completed: bank.transaction.completed
+      failed: bank.transaction.failed
+      reversed: bank.transaction.reversed
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-service.banking.svc.cluster.local:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs}
+
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+
+fraud:
+  service:
+    url: ${FRAUD_SERVICE_URL:http://fraud-service.banking.svc.cluster.local:8094}
+
+accounts:
+  service:
+    url: ${ACCOUNTS_SERVICE_URL:http://accounts-service.banking.svc.cluster.local:8081}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      fraud-service:
+        sliding-window-size: 5
+        failure-rate-threshold: 30
+        wait-duration-in-open-state: 5s
+      accounts-service:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+  timelimiter:
+    instances:
+      fraud-service:
+        timeout-duration: 3s       # fraud must answer in 3s
+      accounts-service:
+        timeout-duration: 5s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
+
+logging:
+  level:
+    com.rewabank: DEBUG
+    org.springframework.security: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{rewabank-correlation-id}] [%X{traceId}] %-5level %logger{36} - %msg%n"

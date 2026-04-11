@@ -1,46 +1,46 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: accounts-ms
+  name: transactions-ms
   namespace: banking
   labels:
-    app: accounts-ms
+    app: transactions-ms
     version: v1
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: accounts-ms
+      app: transactions-ms
   template:
     metadata:
       labels:
-        app: accounts-ms
+        app: transactions-ms
         version: v1
       annotations:
         sidecar.istio.io/inject: "true"
         prometheus.io/scrape: "true"
-        prometheus.io/port:   "8081"
+        prometheus.io/port:   "8082"
         prometheus.io/path:   "/actuator/prometheus"
     spec:
-      serviceAccountName: accounts-ms-sa
+      serviceAccountName: transactions-ms-sa
       containers:
-        - name: accounts-ms
-          image: YOUR_DOCKERHUB/rewabank-accounts-ms:latest
+        - name: transactions-ms
+          image: rewabank/rewabank-transactions-ms:latest
           ports:
-            - containerPort: 8081
+            - containerPort: 8082
           envFrom:
             - configMapRef:
-                name: accounts-ms-config
+                name: transactions-ms-config
           env:
             - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: accounts-db-secret
+                  name: transactions-db-secret
                   key: username
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: accounts-db-secret
+                  name: transactions-db-secret
                   key: password
             - name: REDIS_PASSWORD
               valueFrom:
@@ -49,20 +49,20 @@ spec:
                   key: password
           resources:
             requests:
-              memory: "256Mi"
-              cpu:    "250m"
-            limits:
-              memory: "512Mi"
+              memory: "384Mi"
               cpu:    "500m"
+            limits:
+              memory: "768Mi"
+              cpu:    "1000m"
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: 8081
-            initialDelaySeconds: 60
+              port: 8082
+            initialDelaySeconds: 200
             periodSeconds: 30
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: 8081
-            initialDelaySeconds: 30
+              port: 8082
+            initialDelaySeconds: 180
             periodSeconds: 10

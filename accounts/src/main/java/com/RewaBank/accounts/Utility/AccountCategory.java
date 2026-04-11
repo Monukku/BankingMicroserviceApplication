@@ -1,4 +1,4 @@
-package com.RewaBank.accounts.Utility;
+package com.rewabank.accounts.Utility;
 
 public enum AccountCategory {
     PERSONAL,         // Personal accounts for individual use

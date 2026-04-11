@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+﻿apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api-gateway
@@ -7,7 +7,7 @@ metadata:
     app: api-gateway
     version: v1
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: api-gateway
@@ -17,29 +17,30 @@ spec:
         app: api-gateway
         version: v1
       annotations:
-        sidecar.istio.io/inject: "true"                         # Envoy sidecar injected
+        sidecar.istio.io/inject: "true"
         prometheus.io/scrape: "true"
         prometheus.io/port: "8072"
         prometheus.io/path: "/actuator/prometheus"
     spec:
-      serviceAccountName: api-gateway-sa                        # individual ServiceAccount
+      serviceAccountName: api-gateway-sa
       containers:
         - name: api-gateway
-          image: YOUR_DOCKERHUB/rewabank-api-gateway:latest
+          image: rewabank/rewabank-api-gateway:latest
           ports:
             - containerPort: 8072
           env:
-            - name: SPRING_PROFILES_ACTIVE
-              value: "prod"
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: redis-secret
                   key: password
             - name: KEYCLOAK_JWKS_URI
-              value: "http://keycloak.keycloak.svc.cluster.local:8080/realms/rewabank/protocol/openid-connect/certs"
+              value: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces"
+          envFrom:
+            - configMapRef:
+                name: api-gateway-config
           resources:
             requests:
               memory: "256Mi"
