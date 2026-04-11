@@ -62,7 +62,8 @@ public class GlobalExceptionHandler {
                 "status",      400,
                 "errorCode",   "ACCT_VALIDATION",
                 "message",     "Validation failed",
-                "fieldErrors", errors
+                "fieldErrors", errors,
+                "path",        request.getDescription(false).replace("uri=", "")
         ));
     }
 
@@ -74,7 +75,8 @@ public class GlobalExceptionHandler {
                 "timestamp", LocalDateTime.now().toString(),
                 "status",    500,
                 "errorCode", "ACCT_500",
-                "message",   "An unexpected error occurred"
+                "message",   "An unexpected error occurred",
+                "path",      request.getDescription(false).replace("uri=", "")
         ));
     }
 }
