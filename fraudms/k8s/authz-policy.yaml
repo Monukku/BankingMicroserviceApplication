@@ -1,0 +1,27 @@
+# Only API Gateway can call Auth MS
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-ms-policy
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: auth-ms
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/api-gateway-sa"
+      to:
+        - operation:
+            methods: ["GET", "POST"]
+            paths: ["/api/v1/auth/*"]
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/api-gateway-sa"
+      to:
+        - operation:
+            paths: ["/actuator/health", "/actuator/prometheus"]

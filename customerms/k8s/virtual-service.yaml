@@ -1,0 +1,45 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-gateway-vs
+  namespace: banking
+spec:
+  hosts:
+    - api-gateway-service.banking.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/transactions
+      timeout: 10s
+      retries:
+        attempts: 0             # ZERO retries — no duplicate debits
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+    - match:
+        - uri:
+            prefix: /api/v1/payments
+      timeout: 15s
+      retries:
+        attempts: 0             # ZERO retries — no duplicate payments
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+    - match:
+        - uri:
+            prefix: /api/v1/fraud
+      timeout: 3s               # fraud must respond in 3s
+      retries:
+        attempts: 1
+        retryOn: gateway-error,reset
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+    - route:                    # default — all other routes
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+      timeout: 15s
+      retries:
+        attempts: 2
+        retryOn: gateway-error,reset,retriable-4xx
+        perTryTimeout: 5s

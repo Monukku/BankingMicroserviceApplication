@@ -1,0 +1,49 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: rewabank-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+      tls:
+        httpsRedirect: true     # redirect HTTP → HTTPS
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - "api.rewabank.com"
+        - "localhost"
+      tls:
+        mode: SIMPLE
+        credentialName: rewabank-tls-cert   # K8s TLS secret
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: rewabank-ingress-vs
+  namespace: banking
+spec:
+  hosts:
+    - "api.rewabank.com"
+    - "localhost"
+  gateways:
+    - istio-system/rewabank-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+            port:
+              number: 8072
+      timeout: 30s
