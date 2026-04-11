@@ -320,7 +320,7 @@ public class AccountService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-    private String generateAccountNumber() {
+    protected String generateAccountNumber() {
         String number;
         do {
             // 12-digit account number — SecureRandom
