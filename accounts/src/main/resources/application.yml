@@ -87,6 +87,8 @@ management:
       exposure:
         include: health,info,prometheus
   endpoint:
+    shutdown:
+      enabled: false
     health:
       show-details: always
       probes:
