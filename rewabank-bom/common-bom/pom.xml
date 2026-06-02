@@ -10,10 +10,10 @@
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
 
-	<artifactId>common</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<groupId>com.common</groupId>
+	<artifactId>common-bom</artifactId>
 	<packaging>jar</packaging>
-	<name>common</name>
+	<name>common-bom</name>
 	<description>Common shared library for Rewabank Spring Boot services</description>
 
 	<properties>

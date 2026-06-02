@@ -1,0 +1,22 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: cards-ms-vs
+  namespace: banking
+spec:
+  hosts:
+    - cards-service.banking.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/cards
+      timeout: 10s
+      retries:
+        attempts: 2
+        retryOn: gateway-error,reset,5xx
+        perTryTimeout: 5s
+      route:
+        - destination:
+            host: cards-service.banking.svc.cluster.local
+            port:
+              number: 8092

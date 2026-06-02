@@ -1,0 +1,48 @@
+server:
+  port: 0  # Random port for testing
+
+spring:
+  application:
+    name: "loans"
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:9999/realms/test/protocol/openid-connect/certs
+          issuer-uri: http://localhost:9999/realms/test
+  kafka:
+    bootstrap-servers: "localhost:9092"
+  redis:
+    host: localhost
+    port: 6379
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+  flyway:
+    enabled: false
+feign:
+  accounts-ms:
+    url: "http://localhost:8089"
+  customers-ms:
+    url: "http://localhost:8091"
+
+logging:
+  level:
+    root: WARN
+    com.rewabank.loans: DEBUG
+
+accounts:
+  service:
+    url: http://localhost:9999

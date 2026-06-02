@@ -1,1 +1,6 @@
-﻿{"fullName":"Fresh User","email":"fresh@rewabank.com","mobileNumber":"+91-8876543210","password":"Test@1234"}
+﻿{
+  "fullName":"Fresh User",
+  "email":"fresh@rewabank.com",
+  "mobileNumber":"+91-8876543210",
+  "password":"Test@1234"
+}

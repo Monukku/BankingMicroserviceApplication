@@ -35,7 +35,7 @@
 		<guava.version>33.4.0-jre</guava.version>
 	</properties>
 
-	<!-- ✅ Removed: direct dependencies from BOM (devtools, test) -->
+	<!-- Removed: direct dependencies from BOM (devtools, test) -->
 	<!-- BOM must have NO direct dependencies -->
 
 	<dependencyManagement>
@@ -77,14 +77,14 @@
 
 
 			<!-- ── Individual versions ───────────────── -->
-			<!-- ✅ Fixed: removed type=pom scope=import — lombok is a jar -->
+			<!--  Fixed: removed type=pom scope=import — lombok is a jar -->
 			<dependency>
 				<groupId>org.projectlombok</groupId>
 				<artifactId>lombok</artifactId>
 				<version>${lombok.version}</version>
 			</dependency>
 
-			<!-- ✅ Fixed: removed type=pom scope=import — springdoc is a jar -->
+			<!-- Fixed: removed type=pom scope=import — springdoc is a jar -->
 			<dependency>
 				<groupId>org.springdoc</groupId>
 				<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -120,15 +120,15 @@
 				<version>${guava.version}</version>
 			</dependency>
 
-			<!-- ✅ Removed: axon-bom — not in our architecture -->
-			<!-- ✅ Removed: postgresql explicit version — Spring Boot BOM manages it -->
-			<!-- ✅ Removed: spring-boot-starter-test with wrong variable -->
+			<!-- Removed: axon-bom — not in our architecture -->
+			<!-- Removed: postgresql explicit version — Spring Boot BOM manages it -->
+			<!-- Removed: spring-boot-starter-test with wrong variable -->
 
 		</dependencies>
 	</dependencyManagement>
 
 	<build>
-		<!-- ✅ Fixed: build → pluginManagement so child MS inherit versions -->
+		<!--  Fixed: build → pluginManagement so child MS inherit versions -->
 		<pluginManagement>
 			<plugins>
 

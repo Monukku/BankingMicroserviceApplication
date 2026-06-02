@@ -1,0 +1,22 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: loans-ms-vs
+  namespace: banking
+spec:
+  hosts:
+    - loans-service.banking.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/loans
+      timeout: 10s
+      retries:
+        attempts: 2
+        retryOn: gateway-error,reset
+        perTryTimeout: 5s
+      route:
+        - destination:
+            host: loans-service.banking.svc.cluster.local
+            port:
+              number: 8081

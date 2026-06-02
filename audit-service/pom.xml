@@ -11,9 +11,9 @@
 		<version>0.0.1-SNAPSHOT</version>
 		<relativePath>../rewabank-bom/pom.xml</relativePath>
 	</parent>
-	<artifactId>audit-ms</artifactId>
-	<name>audit-ms</name>
-	<description>RewaBank Audit MS — Append-Only RBI Compliant Audit Log</description>
+	<artifactId>audit-service</artifactId>
+	<name>audit-service</name>
+	<description>RewaBank Audit Service — Append-Only RBI Compliant Audit Log</description>
 
 	<dependencies>
 

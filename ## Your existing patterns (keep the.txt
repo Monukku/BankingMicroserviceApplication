@@ -1,0 +1,161 @@
+## Your existing patterns (keep these consistent)
+
+```
+✅ Spring Boot 3.3 + Java 21
+✅ PostgreSQL + Flyway migrations
+✅ Redis for caching/CQRS read side
+✅ Kafka with Outbox pattern (guaranteed delivery)
+✅ Feign clients for sync MS-to-MS calls
+✅ Resilience4j circuit breakers
+✅ Istio mTLS for internal communication
+✅ JWT (Keycloak) for user auth
+✅ BigDecimal only — never float
+✅ Idempotency keys on all write ops
+```
+
+---
+
+## Loans MS Design
+
+```
+Port:     8090
+DB:       loans_db (PostgreSQL)
+Owns:     Loan lifecycle, EMI schedule, repayment tracking
+
+Sync out:
+  → Accounts MS  /credit  (disburse loan amount)
+  → Customers MS /kyc-status (KYC gate before approval)
+  → Fraud MS     /score (fraud check on large loans)
+
+Consumes (Kafka):
+  bank.kyc.verified       → auto-approve pending loans
+  bank.account.closed     → close associated loans
+
+Publishes (Kafka):
+  bank.loan.applied
+  bank.loan.approved
+  bank.loan.disbursed
+  bank.loan.emi.due
+  bank.loan.closed
+```
+
+**State machine:**
+```
+APPLIED → UNDER_REVIEW → APPROVED → DISBURSED → ACTIVE → CLOSED
+                       ↘ REJECTED
+                                              ↘ DEFAULTED
+```
+
+**Key entities:**
+```java
+Loan          — loanId, customerId, accountId, type, amount, 
+                interestRate, tenure, status, disbursedAt
+EmiSchedule   — loanId, dueDate, amount, principalPart, 
+                interestPart, status, paidAt
+LoanDocument  — loanId, documentType, documentUrl, verifiedAt
+OutboxEvent   — same pattern as transactions MS
+```
+
+**Endpoints:**
+```
+POST   /api/v1/loans/apply              ← customer applies
+GET    /api/v1/loans/my-loans           ← customer views own loans
+GET    /api/v1/loans/{id}               ← loan details
+GET    /api/v1/loans/{id}/emi-schedule  ← EMI schedule
+PATCH  /api/v1/loans/{id}/approve       ← CREDIT_OFFICER only
+PATCH  /api/v1/loans/{id}/reject        ← CREDIT_OFFICER only
+PATCH  /api/v1/loans/{id}/disburse      ← BRANCH_MANAGER only
+POST   /api/v1/loans/{id}/repay         ← customer repays EMI
+```
+
+---
+
+## Cards MS Design
+
+```
+Port:     8092
+DB:       cards_db (PostgreSQL)
+Owns:     Card lifecycle, PIN, limits, block/unblock
+
+Sync out:
+  → Accounts MS /debit  (card transaction debit)
+  → Fraud MS    /score  (fraud check on every transaction)
+
+Consumes (Kafka):
+  bank.account.closed   → auto-block associated cards
+  bank.fraud.alert.raised → auto-block card
+
+Publishes (Kafka):
+  bank.card.issued
+  bank.card.blocked
+  bank.card.transaction
+```
+
+**State machine:**
+```
+PENDING_ACTIVATION → ACTIVE → BLOCKED → CANCELLED
+```
+
+**Key entities:**
+```java
+Card          — cardId, accountId, keycloakUserId, cardNumber (encrypted),
+                cardType, status, expiryDate, cvv (hashed), dailyLimit
+CardTransaction — cardId, amount, merchant, transactionType, 
+                  status, idempotencyKey
+OutboxEvent   — same pattern
+```
+
+**Endpoints:**
+```
+POST   /api/v1/cards/issue              ← TELLER issues card
+GET    /api/v1/cards/my-cards           ← customer views cards
+GET    /api/v1/cards/{id}               ← card details
+PATCH  /api/v1/cards/{id}/block         ← customer or BRANCH_MANAGER
+PATCH  /api/v1/cards/{id}/unblock       ← BRANCH_MANAGER only
+PATCH  /api/v1/cards/{id}/set-limit     ← customer sets daily limit
+POST   /api/v1/cards/{id}/transaction   ← internal — called by POS/ATM MS
+```
+
+---
+
+## Integration with existing services
+
+```
+New Kafka topics to add to existing MS:
+
+Notifications MS listens to:
+  bank.loan.approved    → send approval SMS/email
+  bank.loan.emi.due     → send reminder 3 days before
+  bank.card.issued      → send card details email
+  bank.card.blocked     → send security alert
+
+Fraud MS listens to:
+  bank.card.transaction → async fraud scoring after card txn
+
+Audit MS listens to:
+  bank.loan.*           → audit all loan events
+  bank.card.*           → audit all card events
+```
+
+---
+
+## File structure to follow (same as accounts MS)
+
+```
+loans-ms/
+├── config/     SecurityConfig, KafkaConfig, FeignConfig, RedisConfig
+├── entity/     Loan, EmiSchedule, LoanDocument, OutboxEvent
+├── repository/ LoanRepository, EmiScheduleRepository, OutboxEventRepository
+├── dto/        LoanApplyRequest, LoanResponse, EmiScheduleResponse
+├── client/     AccountsFeignClient, CustomersFeignClient, FraudFeignClient
+├── service/    LoanService, EmiCalculatorService, OutboxPublisherService
+├── kafka/      LoanEventProducer, ExternalEventConsumer
+├── controller/ LoanController
+├── scheduler/  EmiReminderScheduler, OutboxScheduler
+└── exception/  LoanException, GlobalExceptionHandler
+```
+
+Want me to generate the complete code for Loans MS or Cards MS first?
+Q: What do you want to build first? A: Loans MS
+Q: What loan types do you want to support? A: All types including Business
+Q: What card types do you want to support? A: Both debit and credit          do this need full if you feel something could be improved do and it should align  me my all requirement i mean align with existing services

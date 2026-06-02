@@ -1,18 +1,16 @@
 $base = "C:\Users\Monukushw\Downloads\Microservices-22-04-2025"
 
 $services = @(
-    "configserver",
-    "discoveryserver",
-    "accounts",
-    "cards",
-    "loans",
-    "customers",
-#    "audit-service",
-#    "transaction-service",
-#    "verification-service",
-#    "notification-service",
-    "message",
-    "apigateway"
+    "accounts-service",
+    "cards-service",
+    "loans-service",
+    "customers-service",
+    "audit-service",
+    "transactions-service",
+    "auth-service",
+    "fraud-service",
+    "notifications-service",
+    "api-gateway"
 )
 
 foreach ($service in $services) {
