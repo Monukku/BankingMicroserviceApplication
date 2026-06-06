@@ -60,7 +60,7 @@ class DocumentServiceTest {
                 "file", name, "application/pdf", new byte[2048]);
     }
 
-    // ── uploadDocument ────────────────────────────────────────────
+    // â”€â”€ uploadDocument â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @Test
     void uploadDocument_validJpeg_savesDocumentRecord() throws Exception {
@@ -178,7 +178,7 @@ class DocumentServiceTest {
         documentService.uploadDocument("kc-user-1", KycDocument.DocumentType.SELFIE, noExt);
     }
 
-    // ── getDocumentViewUrl ────────────────────────────────────────
+    // â”€â”€ getDocumentViewUrl â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @Test
     void getDocumentViewUrl_found_returnsPresignedUrl() throws Exception {
@@ -192,7 +192,7 @@ class DocumentServiceTest {
         when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
                 .thenReturn("https://minio.rewabank.local/presigned/doc.jpg?token=abc");
 
-        String url = documentService.getDocumentViewUrl(docId);
+        String url = documentService.getDocumentViewUrl(docId, "test-user-id");
 
         assertThat(url).contains("presigned");
         verify(minioClient).getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class));
@@ -203,7 +203,7 @@ class DocumentServiceTest {
         UUID unknownDocId = UUID.randomUUID();
         when(documentRepository.findById(unknownDocId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> documentService.getDocumentViewUrl(unknownDocId))
+        assertThatThrownBy(() -> documentService.getDocumentViewUrl(unknownDocId, "test-user-id"))
                 .isInstanceOf(CustomerException.class)
                 .hasMessageContaining("Document not found");
     }
@@ -219,12 +219,12 @@ class DocumentServiceTest {
         when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
                 .thenThrow(new RuntimeException("MinIO timeout"));
 
-        assertThatThrownBy(() -> documentService.getDocumentViewUrl(docId))
+        assertThatThrownBy(() -> documentService.getDocumentViewUrl(docId, "test-user-id"))
                 .isInstanceOf(CustomerException.class)
                 .hasMessageContaining("Failed to generate document view URL");
     }
 
-    // ── getDocuments ──────────────────────────────────────────────
+    // â”€â”€ getDocuments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @Test
     void getDocuments_returnsListFromRepository() {
