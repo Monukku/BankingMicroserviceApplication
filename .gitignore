@@ -34,3 +34,7 @@ kubeconfig
 .env
 .env.local
 *.env
+
+# Claude conversation file
+CLAUDE.md
+claude.md
