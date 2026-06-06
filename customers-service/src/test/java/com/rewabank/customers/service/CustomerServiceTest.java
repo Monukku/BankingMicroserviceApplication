@@ -5,6 +5,7 @@ import com.rewabank.customers.dto.KycStatusResponse;
 import com.rewabank.customers.entity.Customer;
 import com.rewabank.customers.exception.CustomerException;
 import com.rewabank.customers.repository.CustomerRepository;
+import com.rewabank.customers.services.CustomerService;
 import com.rewabank.customers.util.EncryptionUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,8 @@ class CustomerServiceTest {
     @Mock CustomerRepository customerRepository;
     @Mock EncryptionUtil encryptionUtil;
 
-    @InjectMocks CustomerService customerService;
+    @InjectMocks
+    CustomerService customerService;
 
     private UUID customerId;
     private Customer customer;
