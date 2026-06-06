@@ -17,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -29,18 +30,20 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class DocumentServiceTest {
 
-    @Mock MinioClient              minioClient;
-    @Mock KycDocumentRepository    documentRepository;
-    @Mock CustomerRepository       customerRepository;
+    @Mock MinioClient           minioClient;
+    @Mock KycDocumentRepository documentRepository;
+    @Mock CustomerRepository    customerRepository;
 
-    @InjectMocks
-    DocumentService documentService;
+    @InjectMocks DocumentService documentService;
 
-    private UUID customerId;
+    private UUID     customerId;
     private Customer customer;
 
     @BeforeEach
     void setUp() {
+        // Inject bucket name — @Value does not work with @InjectMocks
+        ReflectionTestUtils.setField(documentService, "bucketName", "rewabank-kyc-docs");
+
         customerId = UUID.randomUUID();
         customer = Customer.builder()
                 .id(customerId)
@@ -53,16 +56,14 @@ class DocumentServiceTest {
     }
 
     private MockMultipartFile validJpeg(String name) {
-        return new MockMultipartFile(
-                "file", name, "image/jpeg", new byte[1024]);
+        return new MockMultipartFile("file", name, "image/jpeg", new byte[1024]);
     }
 
     private MockMultipartFile validPdf(String name) {
-        return new MockMultipartFile(
-                "file", name, "application/pdf", new byte[2048]);
+        return new MockMultipartFile("file", name, "application/pdf", new byte[2048]);
     }
 
-    // â”€â”€ uploadDocument â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── uploadDocument ────────────────────────────────────────────────────────
 
     @Test
     void uploadDocument_validJpeg_savesDocumentRecord() throws Exception {
@@ -116,7 +117,6 @@ class DocumentServiceTest {
 
     @Test
     void uploadDocument_fileTooLarge_throws() {
-        // 5MB + 1 byte
         byte[] bigContent = new byte[5 * 1024 * 1024 + 1];
         MockMultipartFile bigFile = new MockMultipartFile(
                 "file", "big.jpg", "image/jpeg", bigContent);
@@ -163,24 +163,20 @@ class DocumentServiceTest {
     }
 
     @Test
-    void uploadDocument_noExtensionInFilename_usesBinExtension() throws Exception {
+    void uploadDocument_noExtensionInFilename_throwsExtensionNotAllowed() {
+        // Service rejects files with no recognised extension — .bin is NOT in allowed list
         MockMultipartFile noExt = new MockMultipartFile(
                 "file", "noext", "image/jpeg", new byte[512]);
         when(customerRepository.findByKeycloakUserIdAndDeletedAtIsNull("kc-user-1"))
                 .thenReturn(Optional.of(customer));
-        when(minioClient.putObject(any(PutObjectArgs.class)))
-                .thenReturn(mock(ObjectWriteResponse.class));
-        when(documentRepository.save(any())).thenAnswer(inv -> {
-            KycDocument d = inv.getArgument(0);
-            // object key must end with .bin when filename has no extension
-            assertThat(d.getMinioObjectKey()).endsWith(".bin");
-            return d;
-        });
 
-        documentService.uploadDocument("kc-user-1", KycDocument.DocumentType.SELFIE, noExt);
+        assertThatThrownBy(() -> documentService.uploadDocument(
+                "kc-user-1", KycDocument.DocumentType.SELFIE, noExt))
+                .isInstanceOf(CustomerException.class)
+                .hasMessageContaining("File extension not allowed");
     }
 
-    // â”€â”€ getDocumentViewUrl â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── getDocumentViewUrl ────────────────────────────────────────────────────
 
     @Test
     void getDocumentViewUrl_found_returnsPresignedUrl() throws Exception {
@@ -226,7 +222,7 @@ class DocumentServiceTest {
                 .hasMessageContaining("Failed to generate document view URL");
     }
 
-    // â”€â”€ getDocuments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── getDocuments ──────────────────────────────────────────────────────────
 
     @Test
     void getDocuments_returnsListFromRepository() {
