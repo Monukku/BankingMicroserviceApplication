@@ -5,6 +5,7 @@ import com.rewabank.customers.entity.KycDocument;
 import com.rewabank.customers.exception.CustomerException;
 import com.rewabank.customers.repository.CustomerRepository;
 import com.rewabank.customers.repository.KycDocumentRepository;
+import com.rewabank.customers.services.DocumentService;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.ObjectWriteResponse;
@@ -32,7 +33,8 @@ class DocumentServiceTest {
     @Mock KycDocumentRepository    documentRepository;
     @Mock CustomerRepository       customerRepository;
 
-    @InjectMocks DocumentService documentService;
+    @InjectMocks
+    DocumentService documentService;
 
     private UUID customerId;
     private Customer customer;

@@ -1,4 +1,4 @@
-package com.rewabank.customers.service;
+package com.rewabank.customers.services;
 
 import com.rewabank.customers.entity.Customer;
 import com.rewabank.customers.entity.KycDocument;
