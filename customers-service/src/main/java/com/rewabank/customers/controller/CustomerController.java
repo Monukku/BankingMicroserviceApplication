@@ -2,7 +2,7 @@ package com.rewabank.customers.controller;
 
 import com.rewabank.customers.dto.CustomerResponse;
 import com.rewabank.customers.dto.KycStatusResponse;
-import com.rewabank.customers.service.CustomerService;
+import com.rewabank.customers.services.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

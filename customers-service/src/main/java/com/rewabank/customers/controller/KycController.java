@@ -3,7 +3,7 @@ package com.rewabank.customers.controller;
 import com.rewabank.customers.dto.KycSubmitRequest;
 import com.rewabank.customers.dto.KycVerifyRequest;
 import com.rewabank.customers.entity.KycDocument;
-import com.rewabank.customers.service.DocumentService;
+import com.rewabank.customers.services.DocumentService;
 import com.rewabank.customers.services.KycService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

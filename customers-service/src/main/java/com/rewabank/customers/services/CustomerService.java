@@ -1,4 +1,4 @@
-package com.rewabank.customers.service;
+package com.rewabank.customers.services;
 
 import com.rewabank.customers.dto.CustomerResponse;
 import com.rewabank.customers.dto.KycStatusResponse;

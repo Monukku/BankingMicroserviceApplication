@@ -15,7 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.rewabank.customers.service.CustomerService;
+import com.rewabank.customers.services.CustomerService;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
