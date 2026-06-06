@@ -39,7 +39,7 @@ public class KycController {
                 "KYC submitted successfully. Our team will review within 2 business days."));
     }
 
-    // Upload KYC document
+    // Upload KYC document — max 5 MB enforced by spring.servlet.multipart.max-file-size
     @PostMapping(value = "/documents/upload",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload KYC document")
@@ -47,6 +47,10 @@ public class KycController {
             @RequestParam KycDocument.DocumentType documentType,
             @RequestParam MultipartFile file,
             @AuthenticationPrincipal Jwt jwt) {
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "File must not be empty"));
+        }
         KycDocument doc = documentService.uploadDocument(
                 jwt.getSubject(), documentType, file);
         return ResponseEntity.ok(Map.of(
@@ -79,13 +83,14 @@ public class KycController {
                 "KYC " + request.decision() + " successfully"));
     }
 
-    // Get document presigned URL — RM only
+    // Get document presigned URL — RM/Auditor only; access is audit-logged
     @GetMapping("/documents/{documentId}/view-url")
     @PreAuthorize("hasAnyRole('RELATIONSHIP_MANAGER','BRANCH_MANAGER','SUPER_ADMIN','AUDITOR')")
     @Operation(summary = "Get document view URL (15 min expiry)")
     public ResponseEntity<Map<String, String>> getDocumentUrl(
-            @PathVariable UUID documentId) {
-        String url = documentService.getDocumentViewUrl(documentId);
+            @PathVariable UUID documentId,
+            @AuthenticationPrincipal Jwt jwt) {
+        String url = documentService.getDocumentViewUrl(documentId, jwt.getSubject());
         return ResponseEntity.ok(Map.of("url", url, "expiresInMinutes", "15"));
     }
 }

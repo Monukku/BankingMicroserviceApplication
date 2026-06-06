@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -103,7 +104,8 @@ public class TransactionService {
         }
     }
 
-    // Manual reversal — Branch Manager only
+    // Manual reversal — defence-in-depth: controller @PreAuthorize + service-layer check
+    @PreAuthorize("hasAnyRole('BRANCH_MANAGER','SUPER_ADMIN')")
     @Transactional
     public TransactionResponse reverse(UUID transactionId,
                                        String reason,

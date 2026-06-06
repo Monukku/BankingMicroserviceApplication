@@ -1,0 +1,80 @@
+# Zero retries — idempotency by X-Idempotency-Key; retrying a debit risks double-charge
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: transactions-ms-vs
+  namespace: banking
+spec:
+  hosts:
+    - transactions-service.banking.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/transactions
+      timeout: 30s
+      retries:
+        attempts: 0
+      route:
+        - destination:
+            host: transactions-service.banking.svc.cluster.local
+            port:
+              number: 8082
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: transactions-ms-dr
+  namespace: banking
+spec:
+  host: transactions-service.banking.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 200
+      http:
+        http2MaxRequests: 2000
+        maxRequestsPerConnection: 20
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      interval: 10s
+      baseEjectionTime: 30s
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: transactions-ms-mtls
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: transactions-ms
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: transactions-ms-policy
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: transactions-ms
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/api-gateway-sa"
+      to:
+        - operation:
+            methods: ["GET","POST"]
+            paths: ["/api/v1/transactions/*", "/api/v1/transactions"]
+    - from:
+        - source:
+            namespaces: ["monitoring"]
+      to:
+        - operation:
+            paths: ["/actuator/health", "/actuator/prometheus"]

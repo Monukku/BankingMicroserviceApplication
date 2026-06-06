@@ -2,9 +2,11 @@ package com.rewabank.gateway.filter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -17,6 +19,9 @@ import reactor.core.publisher.Mono;
 public class AuthenticationFilter implements GlobalFilter {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthenticationFilter.class);
+
+    @Autowired
+    FilterUtility filterUtility;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -34,12 +39,18 @@ public class AuthenticationFilter implements GlobalFilter {
 
                         logger.debug("Injecting headers — userId: {}, roles: {}", userId, roles);
 
+                        // Forward correlation ID set by RequestTraceFilter (Order 1)
+                        HttpHeaders incomingHeaders = exchange.getRequest().getHeaders();
+                        String correlationId = filterUtility.getCorrelationId(incomingHeaders);
+
                         // Downstream MS read these headers — they never re-validate JWT
                         ServerWebExchange mutated = exchange.mutate()
                                 .request(r -> r
                                         .header("X-User-Id",    userId != null ? userId : "")
                                         .header("X-User-Email", email  != null ? email  : "")
-                                        .header("X-User-Role",  roles))
+                                        .header("X-User-Role",  roles)
+                                        .header(FilterUtility.CORRELATION_ID,
+                                                correlationId != null ? correlationId : ""))
                                 .build();
 
                         return chain.filter(mutated);

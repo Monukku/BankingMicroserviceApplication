@@ -1,25 +1,36 @@
 package com.rewabank.notifications;
 
+import com.rewabank.notifications.repository.NotificationLogRepository;
+import com.rewabank.notifications.repository.NotificationTemplateRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration;
+import org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration;
+import org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration;
+import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
+@EnableAutoConfiguration(exclude = {
+        MongoAutoConfiguration.class,
+        MongoDataAutoConfiguration.class,
+        MongoRepositoriesAutoConfiguration.class,
+        KafkaAutoConfiguration.class
+})
 @TestPropertySource(properties = {
-	"spring.jpa.hibernate.ddl-auto=create-drop",
-	"spring.datasource.url=jdbc:h2:mem:testdb",
-	"spring.datasource.driver-class-name=org.h2.Driver",
-	"spring.datasource.username=sa",
-	"spring.datasource.password=",
-	"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-	"build.version=1.0.0"
+        "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost:8080/realms/test",
+        "build.version=1.0.0"
 })
 class NotificationServiceApplicationTests {
 
-	@Test
-	void contextLoads() {
-		// Test that the application context loads successfully
-		assert true;
-	}
+    @MockitoBean NotificationTemplateRepository templateRepository;
+    @MockitoBean NotificationLogRepository      logRepository;
+    @MockitoBean KafkaTemplate<?, ?>            kafkaTemplate;
 
+    @Test
+    void contextLoads() {
+    }
 }

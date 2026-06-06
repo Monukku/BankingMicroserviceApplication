@@ -1,0 +1,79 @@
+#-------------------------------------------------------------------------------#
+#                    RewaBank — Qodana Configuration                            #
+#             https://www.jetbrains.com/help/qodana/qodana-yaml.html            #
+#                                                                               #
+#  FILE LOCATION: repo root/qodana.yaml                                        #
+#  PURPOSE: Tells Qodana WHAT to scan and HOW                                  #
+#-------------------------------------------------------------------------------#
+
+version: "1.0"
+
+# JVM Community linter — works with Spring Boot, Java 21
+linter: jetbrains/qodana-jvm-community:2026.1
+
+projectJDK: "21"
+
+# Use recommended profile — catches real bugs not just style issues
+profile:
+  name: qodana.recommended
+
+# ── Enabled inspections (critical for banking) ────────────────────────────────
+include:
+  - name: SqlNoDataSourceInspection                 # SQL issues
+  - name: ConstantConditions                        # Null pointer risks
+  - name: OptionalUsedAsFieldOrParameterType        # Bad Optional usage
+  - name: BigDecimalMethodWithoutRoundingCalled     # BigDecimal rounding — critical for money
+  - name: UnnecessaryLocalVariable
+  - name: StringEquality                            # == instead of .equals()
+  - name: ThrowablePrintStackTrace                  # Don't print stack traces in prod
+  - name: SystemOutErr                              # No System.out in production code
+
+# ── Disabled inspections (too noisy / not relevant) ──────────────────────────
+exclude:
+  # Lombok generates code that triggers these
+  - name: UnusedDeclaration
+    paths:
+      - "*/entity/*.java"
+      - "*/dto/*.java"
+
+  # Test code — relax rules
+  - name: JUnitTestMethodWithoutAssertion
+    paths:
+      - "*/test/**"
+
+  # Flyway migrations — SQL style varies
+  - name: SqlResolve
+    paths:
+      - "*/db/migration/**"
+
+  # Generated and compiled code — never scan
+  - name: ALL
+    paths:
+      - "*/target/**"
+      - "**/generated-sources/**"
+
+  # Suppress Javadoc warnings — not required for internal microservices
+  - name: JavadocDeclaration
+  - name: MissingJavadoc
+
+# ── Quality Gate ──────────────────────────────────────────────────────────────
+# CI fails if these thresholds are exceeded
+failureConditions:
+  severityThresholds:
+    any: 50        # max total problems allowed
+    critical: 0    # zero tolerance on critical bugs
+    high: 10       # max high severity problems
+
+# ── Scan Scope ────────────────────────────────────────────────────────────────
+# Only scan production source — skip tests and generated code
+analyzeScope:
+  - "accounts-service/src/main/**"
+  - "apigateway/src/main/**"
+  - "audit-service/src/main/**"
+  - "authms/src/main/**"
+  - "cards-service/src/main/**"
+  - "customerms/src/main/**"
+  - "fraudms/src/main/**"
+  - "loans-service/src/main/**"
+  - "notificationms/src/main/**"
+  - "transaction-service/src/main/**"

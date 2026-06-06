@@ -1,0 +1,96 @@
+name: RewaBank Infra Deploy
+
+# Separate pipeline for infrastructure changes
+# This is intentionally decoupled from app CI
+# Run manually or when infra files change
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options: [ production, staging ]
+      confirm:
+        description: 'Type CONFIRM to proceed'
+        required: true
+  push:
+    branches: [ "master", "main" ]
+    paths:
+      - 'k8s/postgres-cluster.yaml'
+      - 'k8s/kafka-cluster.yaml'
+      - 'k8s/valkey.yaml'
+      - 'k8s/mongodb-cluster.yaml'
+      - 'k8s/mtls-strict.yaml'
+      - 'k8s/istio/**'
+
+jobs:
+  # Safety gate — requires manual confirmation for infra changes
+  confirm:
+    name: Confirm Infra Deploy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Validate confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "CONFIRM" ]; then
+            echo "❌ You must type CONFIRM to deploy infra changes"
+            exit 1
+          fi
+          echo "✅ Confirmed — proceeding with infra deploy"
+
+  deploy-infra:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: confirm
+    if: always() && (needs.confirm.result == 'success' || github.event_name == 'push')
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify cluster
+        run: kubectl get nodes
+
+      - name: Apply mTLS policy
+        run: kubectl apply -f k8s/mtls-strict.yaml
+
+      - name: Apply PostgreSQL cluster
+        run: |
+          kubectl apply -f k8s/postgres-cluster.yaml
+          echo "⏳ Waiting for PostgreSQL..."
+          kubectl wait --for=condition=ready pod -l cnpg.io/cluster=postgresql -n banking --timeout=300s
+
+      - name: Apply Kafka cluster
+        run: |
+          kubectl apply -f k8s/kafka-cluster.yaml
+          echo "⏳ Waiting for Kafka..."
+          kubectl wait kafka/kafka --for=condition=Ready --timeout=300s -n banking
+
+      - name: Apply Valkey (Redis)
+        run: |
+          kubectl apply -f k8s/valkey.yaml
+          kubectl wait --for=condition=ready pod -l app=valkey -n banking --timeout=120s
+
+      - name: Apply MongoDB
+        run: |
+          kubectl apply -f k8s/mongodb-cluster.yaml
+          kubectl wait --for=condition=ready pod -l app=mongodb-svc -n banking --timeout=300s
+
+      - name: Infrastructure summary
+        run: |
+          echo "=============================="
+          echo "  INFRA SUMMARY"
+          echo "=============================="
+          kubectl get pods -n banking
+          kubectl get pods -n cnpg-system

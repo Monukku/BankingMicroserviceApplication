@@ -26,9 +26,10 @@ public class CardController {
     @Operation(summary = "Issue a new card")
     public ResponseEntity<CardResponse> issueCard(
             @Valid @RequestBody CardIssueRequest request,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(cardService.issueCard(jwt.getSubject(), request));
+                .body(cardService.issueCard(jwt.getSubject(), request, idempotencyKey));
     }
 
     @GetMapping("/my-cards")

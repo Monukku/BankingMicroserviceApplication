@@ -13,9 +13,10 @@ spring:
     username: ${DB_USERNAME:transactions_user}
     password: ${DB_PASSWORD}
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: 30
+      minimum-idle: 8
       connection-timeout: 30000
+      keepalive-time: 30000
 
   jpa:
     hibernate:
@@ -30,6 +31,10 @@ spring:
     locations: classpath:db/migration
 
   data:
+    web:
+      pageable:
+        max-page-size: 100   # prevent large result set DoS
+        default-page-size: 20
     redis:
       host: ${REDIS_HOST:redis-service.banking.svc.cluster.local}
       port: ${REDIS_PORT:6379}
@@ -75,19 +80,19 @@ resilience4j:
   circuitbreaker:
     instances:
       fraud-service:
-        sliding-window-size: 5
-        failure-rate-threshold: 30
-        wait-duration-in-open-state: 5s
+        sliding-window-size: ${CB_FRAUD_WINDOW:5}
+        failure-rate-threshold: ${CB_FRAUD_FAILURE_RATE:30}
+        wait-duration-in-open-state: ${CB_FRAUD_WAIT:5s}
       accounts-service:
-        sliding-window-size: 10
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 10s
+        sliding-window-size: ${CB_ACCOUNTS_WINDOW:10}
+        failure-rate-threshold: ${CB_ACCOUNTS_FAILURE_RATE:50}
+        wait-duration-in-open-state: ${CB_ACCOUNTS_WAIT:10s}
   timelimiter:
     instances:
       fraud-service:
-        timeout-duration: 3s       # fraud must answer in 3s
+        timeout-duration: ${CB_FRAUD_TIMEOUT:3s}    # fraud must answer in 3s
       accounts-service:
-        timeout-duration: 5s
+        timeout-duration: ${CB_ACCOUNTS_TIMEOUT:5s}
 
 management:
   endpoints:
@@ -114,7 +119,7 @@ management:
 
 logging:
   level:
-    com.rewabank: DEBUG
+    com.rewabank: INFO
     org.springframework.security: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{rewabank-correlation-id}] [%X{traceId}] %-5level %logger{36} - %msg%n"

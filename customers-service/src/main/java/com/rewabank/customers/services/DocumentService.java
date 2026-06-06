@@ -36,6 +36,9 @@ public class DocumentService {
     private static final List<String> ALLOWED_TYPES = List.of(
             "image/jpeg", "image/png", "application/pdf"
     );
+    private static final List<String> ALLOWED_EXTENSIONS = List.of(
+            ".jpg", ".jpeg", ".png", ".pdf"
+    );
 
     @Transactional
     public KycDocument uploadDocument(String keycloakUserId,
@@ -87,10 +90,12 @@ public class DocumentService {
         return documentRepository.save(doc);
     }
 
-    // Generate pre-signed URL for RM to view document (expires in 15 min)
-    public String getDocumentViewUrl(UUID documentId) {
+    // Generate pre-signed URL for RM/Auditor to view document (expires in 15 min)
+    public String getDocumentViewUrl(UUID documentId, String requestedByUserId) {
         KycDocument doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new CustomerException("CUST_011", "Document not found"));
+        log.info("KYC document access: documentId={} customerId={} requestedBy={}",
+                documentId, doc.getCustomerId(), requestedByUserId);
         try {
             return minioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
@@ -111,9 +116,18 @@ public class DocumentService {
     }
 
     private String buildObjectKey(UUID customerId, KycDocument.DocumentType type, String fileName) {
-        String ext = fileName != null && fileName.contains(".")
-                ? fileName.substring(fileName.lastIndexOf('.'))
+        // Strip path components to prevent traversal; only use the sanitized extension
+        String safeName = fileName != null
+                ? java.nio.file.Paths.get(fileName).getFileName().toString()
+                : "upload";
+        String ext = safeName.contains(".")
+                ? safeName.substring(safeName.lastIndexOf('.')).toLowerCase()
                 : ".bin";
+        // Whitelist extension — reject anything not in allowed list
+        if (!ALLOWED_EXTENSIONS.contains(ext)) {
+            throw new CustomerException("CUST_013",
+                    "File extension not allowed. Allowed: " + ALLOWED_EXTENSIONS);
+        }
         return String.format("kyc/%s/%s/%s%s",
                 customerId, type.name().toLowerCase(),
                 UUID.randomUUID(), ext);

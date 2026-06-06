@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: transactions-ms-sa
+  namespace: banking
+  labels:
+    app: transactions-ms
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: transactions-ms-config
+  namespace: banking
+data:
+  DB_URL:               "jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/transactions_db"
+  REDIS_HOST:           "valkey.banking.svc.cluster.local"
+  KAFKA_BOOTSTRAP:      "kafka-kafka-bootstrap.banking.svc.cluster.local:9092"
+  KEYCLOAK_JWKS_URI:    "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs"
+  FRAUD_SERVICE_URL:    "http://fraud-service.banking.svc.cluster.local:8094"
+  ACCOUNTS_SERVICE_URL: "http://accounts-service.banking.svc.cluster.local:8081"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transactions-ms
+  namespace: banking
+  labels:
+    app: transactions-ms
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transactions-ms
+  template:
+    metadata:
+      labels:
+        app: transactions-ms
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "8082"
+        prometheus.io/path:   "/actuator/prometheus"
+    spec:
+      serviceAccountName: transactions-ms-sa
+      containers:
+        - name: transactions-ms
+          image: ghcr.io/rewabank/transactions-service:latest
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - configMapRef:
+                name: transactions-ms-config
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: transactions-db-secret
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: transactions-db-secret
+                  key: password
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu:    "500m"
+            limits:
+              memory: "768Mi"
+              cpu:    "1000m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            initialDelaySeconds: 200
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+            initialDelaySeconds: 180
+            periodSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transactions-service
+  namespace: banking
+  labels:
+    app: transactions-ms
+spec:
+  selector:
+    app: transactions-ms
+  ports:
+    - name: http
+      port: 8082
+      targetPort: 8082
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: transactions-ms-hpa
+  namespace: banking
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: transactions-ms
+  minReplicas: 1
+  maxReplicas: 1
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: transactions-ms-pdb
+  namespace: banking
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: transactions-ms

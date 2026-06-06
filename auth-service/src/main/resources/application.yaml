@@ -70,6 +70,10 @@ kafka:
 
 otp:
   expiry-seconds: 300            # 5 minutes
+  bcrypt-strength: 5             # 2^5=32 iterations — fast for short-lived OTPs
+  max-attempts: 3                # OTPs per rate window before throttle
+  rate-window-minutes: 10        # rate-limit window
+  lock-minutes: 15               # account lock duration after max failed verifications
 
 management:
   endpoints:
@@ -96,7 +100,7 @@ management:
 
 logging:
   level:
-    com.rewabank: DEBUG
+    com.rewabank: INFO
     org.springframework.security: INFO
     org.hibernate.SQL: INFO
   pattern:

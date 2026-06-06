@@ -101,6 +101,13 @@ public class AccountService {
                     "Account cannot be activated from state: " + account.getStatus());
         }
 
+        // Guard: prevent activating a duplicate account type for this customer
+        if (accountRepository.existsByCustomerIdAndAccountTypeAndStatusAndDeletedAtIsNull(
+                account.getCustomerId(), account.getAccountType(), Account.AccountStatus.ACTIVE)) {
+            throw new AccountException("ACCT_003",
+                    "Customer already has an active " + account.getAccountType() + " account");
+        }
+
         // KYC gate — sync call to Customers MS
         KycStatusResponse kyc = customersFeignClient
                 .getKycStatus(account.getCustomerId());
@@ -321,11 +328,10 @@ public class AccountService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     protected String generateAccountNumber() {
+        // nextLong(bound) produces uniform distribution; nextDouble() does not
         String number;
         do {
-            // 12-digit account number — SecureRandom
-            long raw = (long) (secureRandom.nextDouble() * 900_000_000_000L)
-                    + 100_000_000_000L;
+            long raw = 100_000_000_000L + (secureRandom.nextLong(900_000_000_000L));
             number = String.valueOf(raw);
         } while (accountRepository.existsByAccountNumberAndDeletedAtIsNull(number));
         return number;

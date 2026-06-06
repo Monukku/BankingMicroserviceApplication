@@ -213,13 +213,214 @@ class AccountServiceTest {
 
     @Test
     void getById_ShouldReturnAccountSuccessfully() throws AccountException {
-        // Arrange
         when(accountsRepository.findByIdAndDeletedAtIsNull(account.getId())).thenReturn(Optional.of(account));
 
-        // Act
         AccountResponse response = accountService.getById(account.getId());
 
-        // Assert
         assertEquals(account.getAccountNumber(), response.accountNumber());
+    }
+
+    // ── credit() ──────────────────────────────────────────────────────────────
+
+    @Test
+    void credit_ShouldCreditSuccessfully() throws Exception {
+        account.setStatus(Account.AccountStatus.ACTIVE);
+        account.setBalance(new BigDecimal("1000.00"));
+        when(accountsRepository.findByIdForUpdate(account.getId())).thenReturn(Optional.of(account));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+        AccountResponse response = accountService.credit(account.getId(),
+                new BigDecimal("500.00"), "corr-001");
+
+        assertEquals(new BigDecimal("1500.00"), response.balance());
+        verify(accountsRepository).save(account);
+        verify(accountReadService).updateBalanceCache(account);
+        verify(outboxEventRepository).save(any());
+    }
+
+    @Test
+    void credit_ShouldThrowException_WhenAmountIsZero() {
+        assertThrows(AccountException.class,
+                () -> accountService.credit(account.getId(), BigDecimal.ZERO, "corr-002"));
+    }
+
+    @Test
+    void credit_ShouldThrowException_WhenAmountIsNegative() {
+        assertThrows(AccountException.class,
+                () -> accountService.credit(account.getId(), new BigDecimal("-100"), "corr-003"));
+    }
+
+    @Test
+    void credit_ShouldThrowException_WhenAccountNotFound() {
+        when(accountsRepository.findByIdForUpdate(account.getId())).thenReturn(Optional.empty());
+
+        assertThrows(AccountException.class,
+                () -> accountService.credit(account.getId(), new BigDecimal("100"), "corr-004"));
+    }
+
+    @Test
+    void credit_ShouldThrowException_WhenAccountNotActive() {
+        account.setStatus(Account.AccountStatus.FROZEN);
+        when(accountsRepository.findByIdForUpdate(account.getId())).thenReturn(Optional.of(account));
+
+        AccountException ex = assertThrows(AccountException.class,
+                () -> accountService.credit(account.getId(), new BigDecimal("100"), "corr-005"));
+        assertEquals("ACCT_006", ex.getErrorCode());
+    }
+
+    // ── debit() ───────────────────────────────────────────────────────────────
+
+    @Test
+    void debit_ShouldDebitSuccessfully() throws Exception {
+        account.setStatus(Account.AccountStatus.ACTIVE);
+        account.setBalance(new BigDecimal("5000.00"));
+        account.setMinimumBalance(new BigDecimal("1000.00"));
+        when(accountsRepository.findByIdForUpdate(account.getId())).thenReturn(Optional.of(account));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+        AccountResponse response = accountService.debit(account.getId(),
+                new BigDecimal("2000.00"), "corr-010");
+
+        assertEquals(new BigDecimal("3000.00"), response.balance());
+        verify(accountsRepository).save(account);
+        verify(accountReadService).updateBalanceCache(account);
+        verify(outboxEventRepository).save(any());
+    }
+
+    @Test
+    void debit_ShouldThrowException_WhenAmountIsNegative() {
+        assertThrows(AccountException.class,
+                () -> accountService.debit(account.getId(), new BigDecimal("-50"), "corr-011"));
+    }
+
+    @Test
+    void debit_ShouldThrowException_WhenAccountNotFound() {
+        when(accountsRepository.findByIdForUpdate(account.getId())).thenReturn(Optional.empty());
+
+        assertThrows(AccountException.class,
+                () -> accountService.debit(account.getId(), new BigDecimal("100"), "corr-012"));
+    }
+
+    @Test
+    void debit_ShouldThrowException_WhenAccountNotActive() {
+        account.setStatus(Account.AccountStatus.DORMANT);
+        when(accountsRepository.findByIdForUpdate(account.getId())).thenReturn(Optional.of(account));
+
+        AccountException ex = assertThrows(AccountException.class,
+                () -> accountService.debit(account.getId(), new BigDecimal("100"), "corr-013"));
+        assertEquals("ACCT_006", ex.getErrorCode());
+    }
+
+    @Test
+    void debit_ShouldThrowException_WhenInsufficientBalance() {
+        account.setStatus(Account.AccountStatus.ACTIVE);
+        account.setBalance(new BigDecimal("1000.00"));
+        account.setMinimumBalance(new BigDecimal("1000.00")); // available = 0
+        when(accountsRepository.findByIdForUpdate(account.getId())).thenReturn(Optional.of(account));
+
+        AccountException ex = assertThrows(AccountException.class,
+                () -> accountService.debit(account.getId(), new BigDecimal("500.00"), "corr-014"));
+        assertEquals("ACCT_007", ex.getErrorCode());
+    }
+
+    @Test
+    void debit_ShouldThrowException_WhenDebitExceedsAvailableBalance() {
+        account.setStatus(Account.AccountStatus.ACTIVE);
+        account.setBalance(new BigDecimal("2000.00"));
+        account.setMinimumBalance(new BigDecimal("1000.00")); // available = 1000
+        when(accountsRepository.findByIdForUpdate(account.getId())).thenReturn(Optional.of(account));
+
+        assertThrows(AccountException.class,
+                () -> accountService.debit(account.getId(), new BigDecimal("1500.00"), "corr-015"));
+    }
+
+    // ── markDormant() ─────────────────────────────────────────────────────────
+
+    @Test
+    void markDormant_ShouldMarkDormant_WhenAccountIsActive() throws Exception {
+        account.setStatus(Account.AccountStatus.ACTIVE);
+        when(accountsRepository.findByIdAndDeletedAtIsNull(account.getId()))
+                .thenReturn(Optional.of(account));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+        accountService.markDormant(account.getId());
+
+        assertEquals(Account.AccountStatus.DORMANT, account.getStatus());
+        verify(accountsRepository).save(account);
+        verify(outboxEventRepository).save(any());
+    }
+
+    @Test
+    void markDormant_ShouldNotMarkDormant_WhenAccountIsAlreadyFrozen() {
+        account.setStatus(Account.AccountStatus.FROZEN);
+        when(accountsRepository.findByIdAndDeletedAtIsNull(account.getId()))
+                .thenReturn(Optional.of(account));
+
+        accountService.markDormant(account.getId());
+
+        assertEquals(Account.AccountStatus.FROZEN, account.getStatus());
+        verify(accountsRepository, never()).save(any());
+    }
+
+    @Test
+    void markDormant_ShouldThrowException_WhenAccountNotFound() {
+        when(accountsRepository.findByIdAndDeletedAtIsNull(account.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThrows(AccountException.class,
+                () -> accountService.markDormant(account.getId()));
+    }
+
+    // ── minimumBalance by account type ────────────────────────────────────────
+
+    @Test
+    void createAccount_ShouldSetCorrectMinimumBalance_ForCurrentAccount() throws Exception {
+        AccountCreateRequest currentRequest =
+                new AccountCreateRequest(Account.AccountType.CURRENT, "BR001", "IFSC001");
+        when(accountsRepository.findByCustomerIdAndDeletedAtIsNull(customerId))
+                .thenReturn(List.of());
+        doReturn("123456789013").when(accountService).generateAccountNumber();
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+        Account savedAccount = Account.builder()
+                .id(UUID.randomUUID())
+                .accountNumber("123456789013")
+                .keycloakUserId(keycloakUserId)
+                .customerId(customerId)
+                .accountType(Account.AccountType.CURRENT)
+                .balance(BigDecimal.ZERO)
+                .minimumBalance(new BigDecimal("10000.00"))
+                .status(Account.AccountStatus.PENDING)
+                .build();
+        when(accountsRepository.save(any(Account.class))).thenReturn(savedAccount);
+
+        AccountResponse response = accountService.createAccount(keycloakUserId, customerId, currentRequest);
+
+        assertEquals(Account.AccountType.CURRENT, response.accountType());
+    }
+
+    @Test
+    void activateAccount_ShouldThrowException_WhenKycNotVerified() throws Exception {
+        account.setStatus(Account.AccountStatus.PENDING);
+        when(accountsRepository.findByIdAndDeletedAtIsNull(account.getId()))
+                .thenReturn(Optional.of(account));
+        when(customersFeignClient.getKycStatus(account.getCustomerId()))
+                .thenReturn(new KycStatusResponse(account.getCustomerId().toString(),
+                        account.getKeycloakUserId(), "PENDING", false, "KYC pending"));
+
+        AccountException ex = assertThrows(AccountException.class,
+                () -> accountService.activateAccount(account.getId()));
+        assertEquals("ACCT_004", ex.getErrorCode());
+    }
+
+    @Test
+    void activateAccount_ShouldThrowException_WhenAccountNotPending() throws Exception {
+        account.setStatus(Account.AccountStatus.ACTIVE);
+        when(accountsRepository.findByIdAndDeletedAtIsNull(account.getId()))
+                .thenReturn(Optional.of(account));
+
+        AccountException ex = assertThrows(AccountException.class,
+                () -> accountService.activateAccount(account.getId()));
+        assertEquals("ACCT_003", ex.getErrorCode());
     }
 }

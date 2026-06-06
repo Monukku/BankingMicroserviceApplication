@@ -4,6 +4,7 @@ import com.rewabank.fraud.service.FraudAlertService;
 import com.rewabank.fraud.service.FraudScoringService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.annotation.RetryableTopic;
 import org.springframework.retry.annotation.Backoff;
@@ -25,6 +26,9 @@ public class FraudEventConsumer {
 
     private final FraudScoringService fraudScoringService;
     private final FraudAlertService   fraudAlertService;
+
+    @Value("${fraud.alert.threshold:80}")
+    private int alertThreshold;
 
     // Consume completed transactions for pattern analysis
     @RetryableTopic(
@@ -54,7 +58,7 @@ public class FraudEventConsumer {
 
         // If retrospective analysis finds high risk — raise alert
         if ("BLOCK".equals(result.action()) || "FLAG".equals(result.action())) {
-            if (result.score() >= 80) {
+            if (result.score() >= alertThreshold) {
                 fraudAlertService.createAlert(
                         UUID.fromString(accountId),
                         (String) event.get("keycloakUserId"),

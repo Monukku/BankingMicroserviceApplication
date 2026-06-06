@@ -1,25 +1,24 @@
 package com.rewabank.transactions;
 
+import com.rewabank.transactions.client.AccountsFeignClient;
+import com.rewabank.transactions.client.FraudFeignClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
-@TestPropertySource(properties = {
-	"spring.jpa.hibernate.ddl-auto=create-drop",
-	"spring.datasource.url=jdbc:h2:mem:testdb",
-	"spring.datasource.driver-class-name=org.h2.Driver",
-	"spring.datasource.username=sa",
-	"spring.datasource.password=",
-	"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-	"build.version=1.0.0"
-})
+@ActiveProfiles("test")
 class TransactionServiceApplicationTests {
 
-	@Test
-	void contextLoads() {
-		// Test that the application context loads successfully
-		assert true;
-	}
+    // Feign clients — no real services in test environment
+    @SuppressWarnings("deprecation") @MockBean AccountsFeignClient    accountsFeignClient;
+    @SuppressWarnings("deprecation") @MockBean FraudFeignClient       fraudFeignClient;
+    // Redis — excluded from autoconfigure but RedisConfig needs the factory
+    @SuppressWarnings("deprecation") @MockBean RedisConnectionFactory redisConnectionFactory;
 
+    @Test
+    void contextLoads() {
+    }
 }

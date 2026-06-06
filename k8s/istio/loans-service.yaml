@@ -1,0 +1,86 @@
+# BUG FIX: original virtual-service.yaml had port 8081 — loans runs on 8090
+# BUG FIX: original peer-auth.yaml had portLevelMtls "8081" — fixed to "8090"
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: loans-ms-vs
+  namespace: banking
+spec:
+  hosts:
+    - loans-service.banking.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/loans
+      timeout: 10s
+      retries:
+        attempts: 2
+        retryOn: gateway-error,reset
+        perTryTimeout: 5s
+      route:
+        - destination:
+            host: loans-service.banking.svc.cluster.local
+            port:
+              number: 8090
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: loans-ms-dr
+  namespace: banking
+spec:
+  host: loans-service.banking.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http2MaxRequests: 1000
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: loans-ms-mtls
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: loans-ms
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    "8090":
+      mode: PERMISSIVE
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: loans-ms-policy
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: loans-ms
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/api-gateway-sa"
+      to:
+        - operation:
+            methods: ["GET","POST","PATCH"]
+            paths: ["/api/v1/loans/*"]
+    - from:
+        - source:
+            namespaces: ["monitoring"]
+      to:
+        - operation:
+            paths: ["/actuator/health", "/actuator/prometheus"]

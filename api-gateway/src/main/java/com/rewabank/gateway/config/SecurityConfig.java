@@ -97,6 +97,10 @@ public class SecurityConfig {
 
     @Bean
     public CorsWebFilter corsWebFilter() {
+        if ("*".equals(corsOriginWeb) || "*".equals(corsOriginMobile)) {
+            throw new IllegalStateException(
+                    "CORS wildcard '*' is not permitted — set CORS_ORIGIN_WEB and CORS_ORIGIN_MOBILE to specific origins");
+        }
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
         config.setAllowedOrigins(List.of(corsOriginWeb, corsOriginMobile));

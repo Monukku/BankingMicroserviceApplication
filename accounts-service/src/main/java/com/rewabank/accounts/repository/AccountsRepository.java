@@ -47,4 +47,9 @@ public interface AccountsRepository extends JpaRepository<Account, UUID> {
     List<Account> findPendingByCustomerId(UUID customerId);
 
     boolean existsByAccountNumberAndDeletedAtIsNull(String accountNumber);
+
+    boolean existsByCustomerIdAndAccountTypeAndStatusAndDeletedAtIsNull(
+            UUID customerId,
+            Account.AccountType accountType,
+            Account.AccountStatus status);
 }

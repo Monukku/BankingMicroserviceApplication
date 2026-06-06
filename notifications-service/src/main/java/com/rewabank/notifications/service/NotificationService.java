@@ -74,9 +74,8 @@ public class NotificationService {
         }
     }
 
-    // Simple template substitution: {amount} → actual value
-    private String buildMessage(String template,
-                                Map<String, Object> event) {
+    // Template substitution: {key} → value from event map
+    private String buildMessage(String template, Map<String, Object> event) {
         if (template == null) return "";
         String result = template;
         for (Map.Entry<String, Object> entry : event.entrySet()) {
@@ -85,6 +84,11 @@ public class NotificationService {
                         "{" + entry.getKey() + "}",
                         entry.getValue().toString());
             }
+        }
+        // Warn if any placeholders remain — indicates template/event mismatch
+        if (result.contains("{") && result.contains("}")) {
+            log.warn("Unreplaced placeholders in notification message — " +
+                    "eventType: {} message: {}", event.get("eventType"), result);
         }
         return result;
     }

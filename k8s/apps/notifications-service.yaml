@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: notifications-ms-sa
+  namespace: banking
+  labels:
+    app: notifications-ms
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notifications-ms-config
+  namespace: banking
+data:
+  KAFKA_BOOTSTRAP:   "kafka-kafka-bootstrap.banking.svc.cluster.local:9092"
+  KEYCLOAK_JWKS_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs"
+  KEYCLOAK_ISSUER_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank"
+  MONGODB_URI:       "mongodb://$(DB_USERNAME):$(DB_PASSWORD)@mongodb-svc.banking.svc.cluster.local:27017/notifications_db?authSource=admin"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications-ms
+  namespace: banking
+  labels:
+    app: notifications-ms
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notifications-ms
+  template:
+    metadata:
+      labels:
+        app: notifications-ms
+      annotations:
+        sidecar.istio.io/inject: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "9010"
+        prometheus.io/path:   "/actuator/prometheus"
+    spec:
+      serviceAccountName: notifications-ms-sa
+      containers:
+        - name: notifications-ms
+          image: ghcr.io/rewabank/notifications-service:latest
+          ports:
+            - containerPort: 9010
+          envFrom:
+            - configMapRef:
+                name: notifications-ms-config
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu:    "250m"
+            limits:
+              memory: "512Mi"
+              cpu:    "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 9010
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 9010
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications-service
+  namespace: banking
+  labels:
+    app: notifications-ms
+spec:
+  selector:
+    app: notifications-ms
+  ports:
+    - name: http
+      port: 9010
+      targetPort: 9010
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notifications-ms-hpa
+  namespace: banking
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: notifications-ms
+  minReplicas: 1
+  maxReplicas: 1
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: notifications-ms-pdb
+  namespace: banking
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: notifications-ms

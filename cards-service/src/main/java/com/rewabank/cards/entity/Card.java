@@ -94,6 +94,10 @@ public class Card {
     @Column(name = "customer_id")
     private UUID customerId;
 
+    // Caller-supplied idempotency key — duplicate requests return the original card
+    @Column(name = "idempotency_key", unique = true)
+    private String idempotencyKey;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

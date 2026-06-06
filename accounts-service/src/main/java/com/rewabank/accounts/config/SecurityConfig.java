@@ -55,6 +55,10 @@ public class SecurityConfig {
                         .hasAnyRole("BRANCH_MANAGER", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/accounts/*/close")
                         .hasAnyRole("BRANCH_MANAGER", "SUPER_ADMIN")
+                        // Internal MS-to-MS endpoints — transactions-ms service account only
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/accounts/*/debit",
+                                "/api/v1/accounts/*/credit")
+                        .hasRole("TRANSACTIONS_MS")
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

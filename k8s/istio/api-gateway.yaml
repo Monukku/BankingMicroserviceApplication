@@ -1,0 +1,162 @@
+# Istio Gateway in istio-system — opens port 80 to external traffic
+# Routes /auth directly to Keycloak, /api/v1 to api-gateway-service
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: rewabank-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: rewabank-ingress-vs
+  namespace: banking
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - istio-system/rewabank-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /auth
+      route:
+        - destination:
+            host: keycloak-keycloakx-http.keycloak.svc.cluster.local
+            port:
+              number: 80
+      timeout: 30s
+    - match:
+        - uri:
+            prefix: /api/v1/transactions
+        - uri:
+            prefix: /api/v1/payments
+      timeout: 10s
+      retries:
+        attempts: 0
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+            port:
+              number: 8072
+    - match:
+        - uri:
+            prefix: /api/v1
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+            port:
+              number: 8072
+      timeout: 30s
+---
+# Internal mesh VirtualService — controls behaviour for service-to-service calls to api-gateway
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-gateway-vs
+  namespace: banking
+spec:
+  hosts:
+    - api-gateway-service.banking.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/transactions
+      timeout: 10s
+      retries:
+        attempts: 0
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+    - match:
+        - uri:
+            prefix: /api/v1/payments
+      timeout: 15s
+      retries:
+        attempts: 0
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+    - match:
+        - uri:
+            prefix: /api/v1/fraud
+      timeout: 3s
+      retries:
+        attempts: 1
+        retryOn: gateway-error,reset
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+    - route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+      timeout: 15s
+      retries:
+        attempts: 2
+        retryOn: gateway-error,reset,retriable-4xx
+        perTryTimeout: 5s
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-gateway-dr
+  namespace: banking
+spec:
+  host: api-gateway-service.banking.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http2MaxRequests: 1000
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+---
+# Deny all except ingress gateway
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: api-gateway-deny-all
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  action: DENY
+  rules:
+    - from:
+        - source:
+            notPrincipals:
+              - "cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: api-gateway-allow-ingress
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"

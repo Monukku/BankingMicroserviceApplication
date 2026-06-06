@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cards-ms-sa
+  namespace: banking
+  labels:
+    app: cards-ms
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cards-ms-config
+  namespace: banking
+data:
+  KEYCLOAK_JWKS_URI:           "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs"
+  KEYCLOAK_ISSUER_URI:         "http://localhost/auth/realms/rewabank"
+  KAFKA_BOOTSTRAP:             "kafka-kafka-bootstrap.banking.svc.cluster.local:9092"
+  DB_URL:                      "jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/cards_db"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cards-ms
+  namespace: banking
+  labels:
+    app: cards-ms
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cards-ms
+  template:
+    metadata:
+      labels:
+        app: cards-ms
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8092"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      serviceAccountName: cards-ms-sa
+      containers:
+        - name: cards-ms
+          image: ghcr.io/rewabank/cards-service:latest
+          ports:
+            - containerPort: 8092
+          envFrom:
+            - configMapRef:
+                name: cards-ms-config
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: cards-db-secret
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cards-db-secret
+                  key: password
+            - name: AES_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: encryption-secret
+                  key: aes-key
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8092
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8092
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cards-service
+  namespace: banking
+  labels:
+    app: cards-ms
+spec:
+  selector:
+    app: cards-ms
+  ports:
+    - name: http
+      port: 8092
+      targetPort: 8092
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cards-ms-hpa
+  namespace: banking
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cards-ms
+  minReplicas: 1
+  maxReplicas: 1
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cards-ms-pdb
+  namespace: banking
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: cards-ms

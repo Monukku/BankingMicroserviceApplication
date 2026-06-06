@@ -16,10 +16,11 @@ spring:
     username: ${DB_USERNAME:accounts_user}
     password: ${DB_PASSWORD}
     hikari:
-      maximum-pool-size: 15
-      minimum-idle: 3
+      maximum-pool-size: 25
+      minimum-idle: 5
       connection-timeout: 30000
       idle-timeout: 600000
+      keepalive-time: 30000
   jpa:
     hibernate:
       ddl-auto: validate
@@ -47,7 +48,7 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
   security:
     oauth2:
       resourceserver:
@@ -72,14 +73,14 @@ resilience4j:
   circuitbreaker:
     instances:
       customers-service:
-        sliding-window-size: 10
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 10s
+        sliding-window-size: ${CB_SLIDING_WINDOW:10}
+        failure-rate-threshold: ${CB_FAILURE_RATE:50}
+        wait-duration-in-open-state: ${CB_WAIT_DURATION:10s}
         permitted-number-of-calls-in-half-open-state: 2
   timelimiter:
     instances:
       customers-service:
-        timeout-duration: 5s
+        timeout-duration: ${CB_TIMEOUT:5s}
 
 management:
   endpoints:
@@ -108,7 +109,7 @@ management:
 
 logging:
   level:
-    com.rewabank: DEBUG
+    com.rewabank: INFO
     org.springframework.security: INFO
     org.hibernate.SQL: INFO
   pattern:

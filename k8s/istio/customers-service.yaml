@@ -1,0 +1,88 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: customers-ms-vs
+  namespace: banking
+spec:
+  hosts:
+    - customers-service.banking.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1
+      timeout: 15s
+      retries:
+        attempts: 2
+        retryOn: gateway-error,reset
+        perTryTimeout: 7s
+      route:
+        - destination:
+            host: customers-service.banking.svc.cluster.local
+            port:
+              number: 8080
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: customers-ms-dr
+  namespace: banking
+spec:
+  host: customers-service.banking.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http2MaxRequests: 500
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: customers-ms-mtls
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: customers-ms
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: customers-ms-policy
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: customers-ms
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/api-gateway-sa"
+      to:
+        - operation:
+            methods: ["GET", "POST", "PATCH"]
+            paths: ["/api/v1/customers/*", "/api/v1/kyc/*"]
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/accounts-ms-sa"
+      to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/api/v1/customers/*/kyc-status"]
+    - from:
+        - source:
+            namespaces: ["monitoring"]
+      to:
+        - operation:
+            paths: ["/actuator/health", "/actuator/prometheus"]

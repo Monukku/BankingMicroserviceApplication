@@ -59,8 +59,16 @@ public class KeycloakUserService {
             String keycloakUserId = locationHeader.substring(locationHeader.lastIndexOf("/") + 1);
             log.info("User created in Keycloak: {}", keycloakUserId);
 
-            // Assign default CUSTOMER role
-            assignRole(keycloakUserId, "CUSTOMER");
+            // Assign default CUSTOMER role — if this fails, delete the created user
+            // to avoid an orphan account that can never log in and blocks re-registration.
+            try {
+                assignRole(keycloakUserId, "CUSTOMER");
+            } catch (Exception e) {
+                log.error("Role assignment failed for {} — deleting orphan user: {}",
+                        keycloakUserId, e.getMessage());
+                deleteUser(keycloakUserId);
+                throw new AuthException("AUTH_002", "User registration failed: role assignment error");
+            }
 
             return keycloakUserId;
         } else if (response.getStatus() == 409) {
@@ -72,22 +80,28 @@ public class KeycloakUserService {
     }
 
     public void assignRole(String keycloakUserId, String roleName) {
+        var roleRepresentation = keycloak.realm(realm)
+                .roles()
+                .get(roleName)
+                .toRepresentation();
+
+        keycloak.realm(realm)
+                .users()
+                .get(keycloakUserId)
+                .roles()
+                .realmLevel()
+                .add(List.of(roleRepresentation));
+
+        log.info("Role {} assigned to user {}", roleName, keycloakUserId);
+    }
+
+    private void deleteUser(String keycloakUserId) {
         try {
-            var roleRepresentation = keycloak.realm(realm)
-                    .roles()
-                    .get(roleName)
-                    .toRepresentation();
-
-            keycloak.realm(realm)
-                    .users()
-                    .get(keycloakUserId)
-                    .roles()
-                    .realmLevel()
-                    .add(List.of(roleRepresentation));
-
-            log.info("Role {} assigned to user {}", roleName, keycloakUserId);
+            keycloak.realm(realm).users().get(keycloakUserId).remove();
+            log.info("Orphan user deleted from Keycloak: {}", keycloakUserId);
         } catch (Exception e) {
-            log.error("Failed to assign role {} to user {}: {}", roleName, keycloakUserId, e.getMessage());
+            log.error("CRITICAL: Failed to delete orphan Keycloak user {} — manual cleanup required: {}",
+                    keycloakUserId, e.getMessage());
         }
     }
 

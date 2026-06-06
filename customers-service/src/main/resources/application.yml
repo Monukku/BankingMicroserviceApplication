@@ -34,6 +34,10 @@ spring:
     locations: classpath:db/migration
 
   data:
+    web:
+      pageable:
+        max-page-size: 100
+        default-page-size: 20
     redis:
       host: ${REDIS_HOST:redis-service.banking.svc.cluster.local}
       port: ${REDIS_PORT:6379}
@@ -55,7 +59,7 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
 
   security:
     oauth2:
@@ -104,7 +108,7 @@ management:
 
 logging:
   level:
-    com.rewabank: DEBUG
+    com.rewabank: INFO
     org.springframework.security: INFO
     org.hibernate.SQL: INFO
   pattern:

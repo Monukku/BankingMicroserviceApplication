@@ -52,6 +52,9 @@ public class OutboxEvent {
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
 
+    @Column(name = "next_retry_at")
+    private LocalDateTime nextRetryAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

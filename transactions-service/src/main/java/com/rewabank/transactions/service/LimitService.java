@@ -5,11 +5,13 @@ import com.rewabank.transactions.exception.TransactionException;
 import com.rewabank.transactions.repository.DailyLimitRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +42,7 @@ public class LimitService {
                             + maxPerTxn + " for role " + userRole);
         }
 
-        // Daily limit check + consume
+        // Daily limit check + consume (row is locked for the duration of this transaction)
         DailyLimit limit = getOrCreateDailyLimit(keycloakUserId);
         if (!limit.hasCapacity(amount)) {
             throw new TransactionException("TXN_003",
@@ -54,14 +56,30 @@ public class LimitService {
     }
 
     private DailyLimit getOrCreateDailyLimit(String keycloakUserId) {
-        return dailyLimitRepository
-                .findByKeycloakUserIdAndLimitDate(keycloakUserId, LocalDate.now())
-                .orElseGet(() -> dailyLimitRepository.save(
-                        DailyLimit.builder()
-                                .keycloakUserId(keycloakUserId)
-                                .limitDate(LocalDate.now())
-                                .build()
-                ));
+        // SELECT FOR UPDATE — holds the row lock until the outer @Transactional commits,
+        // preventing concurrent requests from both passing the capacity check.
+        Optional<DailyLimit> existing = dailyLimitRepository
+                .findWithLockByKeycloakUserIdAndLimitDate(keycloakUserId, LocalDate.now());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        // Row doesn't exist yet — first transaction of the day for this user.
+        // saveAndFlush forces the INSERT immediately so a concurrent thread's
+        // UNIQUE(keycloak_user_id, limit_date) violation surfaces here, not at commit.
+        try {
+            return dailyLimitRepository.saveAndFlush(
+                    DailyLimit.builder()
+                            .keycloakUserId(keycloakUserId)
+                            .limitDate(LocalDate.now())
+                            .build());
+        } catch (DataIntegrityViolationException e) {
+            // Another concurrent thread inserted first — lock and return their row.
+            return dailyLimitRepository
+                    .findWithLockByKeycloakUserIdAndLimitDate(keycloakUserId, LocalDate.now())
+                    .orElseThrow(() -> new TransactionException("TXN_009",
+                            "Failed to acquire daily limit record"));
+        }
     }
 
     private BigDecimal perTransactionLimit(String role) {

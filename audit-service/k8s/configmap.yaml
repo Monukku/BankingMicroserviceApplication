@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: audit-ms-config
-  namespace: banking
-data:
-  DB_URL:            "jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/audit_db"
-  KAFKA_BOOTSTRAP:   "kafka-kafka-bootstrap.banking.svc.cluster.local:9092"
-  KEYCLOAK_JWKS_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs"

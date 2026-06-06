@@ -1,5 +1,6 @@
 package com.rewabank.cards.service;
 
+import com.rewabank.cards.client.AccountsFeignClient;
 import com.rewabank.cards.dto.*;
 import com.rewabank.cards.entity.Card;
 import com.rewabank.cards.exception.CardException;
@@ -8,7 +9,7 @@ import com.rewabank.cards.repository.CardRepository;
 import com.rewabank.cards.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,8 @@ import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -24,17 +27,41 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CardService {
 
-    private final CardRepository    cardRepository;
-    private final CardEventProducer eventProducer;
-    private final EncryptionUtil    encryptionUtil;
+    private final CardRepository     cardRepository;
+    private final CardEventProducer  eventProducer;
+    private final EncryptionUtil     encryptionUtil;
+    private final PasswordEncoder    cvvPasswordEncoder;
+    private final AccountsFeignClient accountsFeignClient;
 
-    private final BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder(10);
     private final SecureRandom secureRandom = new SecureRandom();
 
     // ── Issue card ────────────────────────────────────────────────────────────
     @Transactional
     public CardResponse issueCard(String keycloakUserId,
-                                  CardIssueRequest request) {
+                                  CardIssueRequest request,
+                                  String idempotencyKey) {
+        // Return existing card if idempotency key already used
+        if (idempotencyKey != null) {
+            Optional<Card> existing = cardRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                return toResponse(existing.get());
+            }
+        }
+
+        // Verify the account belongs to this user
+        try {
+            Map<String, Object> account = accountsFeignClient.getAccount(request.accountId());
+            if (!keycloakUserId.equals(account.get("keycloakUserId"))) {
+                throw new CardException("CARD_003",
+                        "Account does not belong to the requesting user");
+            }
+        } catch (CardException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new CardException("CARD_003",
+                    "Could not verify account ownership: " + e.getMessage());
+        }
+
         // Generate 16-digit card number
         String cardNumber = generateCardNumber(request.cardNetwork());
         String lastFour   = cardNumber.substring(cardNumber.length() - 4);
@@ -42,7 +69,7 @@ public class CardService {
         // Generate CVV
         String cvv     = String.format("%03d",
                 secureRandom.nextInt(1000));
-        String cvvHash = bcrypt.encode(cvv);
+        String cvvHash = cvvPasswordEncoder.encode(cvv);
 
         Card card = Card.builder()
                 .keycloakUserId(keycloakUserId)
@@ -56,6 +83,7 @@ public class CardService {
                 .cvvHash(cvvHash)
                 .nameOnCard(request.nameOnCard() != null
                         ? request.nameOnCard() : "CARD HOLDER")
+                .idempotencyKey(idempotencyKey)
                 .build();
 
         cardRepository.save(card);
@@ -167,7 +195,11 @@ public class CardService {
 
     @Transactional(readOnly = true)
     public CardResponse getById(UUID cardId, String keycloakUserId) {
-        return toResponse(findCardForUser(cardId, keycloakUserId));
+        Card card = findCardForUser(cardId, keycloakUserId);
+        if (card.getStatus() == Card.CardStatus.CANCELLED) {
+            throw new CardException("CARD_001", "Card not found or does not belong to you");
+        }
+        return toResponse(card);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -1,0 +1,82 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: auth-ms-vs
+  namespace: banking
+spec:
+  hosts:
+    - auth-service.banking.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/auth
+      timeout: 10s
+      retries:
+        attempts: 2
+        retryOn: gateway-error,reset
+        perTryTimeout: 5s
+      route:
+        - destination:
+            host: auth-service.banking.svc.cluster.local
+            port:
+              number: 8073
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: auth-ms-dr
+  namespace: banking
+spec:
+  host: auth-service.banking.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http2MaxRequests: 500
+        maxRequestsPerConnection: 5
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: auth-ms-mtls
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: auth-ms
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-ms-policy
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: auth-ms
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/api-gateway-sa"
+      to:
+        - operation:
+            methods: ["GET", "POST"]
+            paths: ["/api/v1/auth/*"]
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/api-gateway-sa"
+      to:
+        - operation:
+            paths: ["/actuator/health", "/actuator/prometheus"]

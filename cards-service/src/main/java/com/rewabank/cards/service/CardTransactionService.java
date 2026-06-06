@@ -220,7 +220,7 @@ public class CardTransactionService {
         }
 
         // Online check
-        if (!card.getOnlineEnabled() && "ONLINE".equals(transaction.getTransactionType())) {
+        if (!card.getOnlineEnabled() && CardTransaction.TransactionType.ONLINE == transaction.getTransactionType()) {
             throw new CardException("TXN_NOT_ALLOWED", "Online transactions not enabled");
         }
     }
@@ -252,10 +252,10 @@ public class CardTransactionService {
                     card.getCustomerId(),
                     transaction.getAmount(),
                     transaction.getCurrency(),
-                    "MERCHANT_ID",  // TODO: Get from transaction
+                    transaction.getMerchantName() != null ? transaction.getMerchantName() : "UNKNOWN",
                     transaction.getTransactionType().name(),
                     transaction.getIsInternational(),
-                    "UNKNOWN"  // TODO: Get channel from transaction
+                    transaction.getChannel() != null ? transaction.getChannel().name() : "UNKNOWN"
             );
 
             var fraudResponse = fraudFeignClient.validateTransaction(fraudRequest);

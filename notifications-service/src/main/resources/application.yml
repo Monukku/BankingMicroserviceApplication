@@ -22,7 +22,7 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
 
   security:
     oauth2:
@@ -54,9 +54,27 @@ management:
     tracing:
       endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
 
+# ── Notification provider config ─────────────────────────────────────────────
+# Set simulation.mode=false in production and supply provider credentials.
+notification:
+  simulation:
+    mode: ${NOTIFICATION_SIMULATION_MODE:true}
+  sms:
+    provider: ${SMS_PROVIDER:log}           # log | twilio | aws-sns
+    twilio-account-sid: ${TWILIO_ACCOUNT_SID:}
+    twilio-auth-token: ${TWILIO_AUTH_TOKEN:}
+    twilio-from-number: ${TWILIO_FROM_NUMBER:}
+  email:
+    provider: ${EMAIL_PROVIDER:log}         # log | smtp | aws-ses | sendgrid
+    from-address: ${EMAIL_FROM:noreply@rewabank.com}
+    sendgrid-api-key: ${SENDGRID_API_KEY:}
+  push:
+    provider: ${PUSH_PROVIDER:log}          # log | fcm
+    fcm-server-key: ${FCM_SERVER_KEY:}
+
 logging:
   level:
-    com.rewabank: DEBUG
+    com.rewabank: INFO
     org.springframework.kafka: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"

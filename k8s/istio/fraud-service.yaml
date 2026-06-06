@@ -1,0 +1,112 @@
+# Score endpoint: 3s hard timeout — fraud must respond within SLA
+# Alert management endpoints: 10s timeout
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fraud-ms-vs
+  namespace: banking
+spec:
+  hosts:
+    - fraud-service.banking.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/fraud/score
+      timeout: 3s
+      retries:
+        attempts: 1
+        retryOn: gateway-error,reset
+        perTryTimeout: 1.5s
+      route:
+        - destination:
+            host: fraud-service.banking.svc.cluster.local
+            port:
+              number: 8094
+    - route:
+        - destination:
+            host: fraud-service.banking.svc.cluster.local
+            port:
+              number: 8094
+      timeout: 10s
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: fraud-ms-dr
+  namespace: banking
+spec:
+  host: fraud-service.banking.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http2MaxRequests: 500
+        maxRequestsPerConnection: 5
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      interval: 5s
+      baseEjectionTime: 10s
+      maxEjectionPercent: 50
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: fraud-ms-mtls
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: fraud-ms
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: fraud-ms-policy
+  namespace: banking
+spec:
+  action: ALLOW
+  selector:
+    matchLabels:
+      app: fraud-ms
+  rules:
+    - to:
+        - operation:
+            paths:
+              - /actuator/health
+              - /actuator/health/liveness
+              - /actuator/health/readiness
+    - from:
+        - source:
+            namespaces:
+              - monitoring
+      to:
+        - operation:
+            paths:
+              - /actuator/prometheus
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/banking/sa/transactions-ms-sa
+      to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/v1/fraud/score
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/banking/sa/api-gateway-sa
+      to:
+        - operation:
+            methods:
+              - GET
+              - PATCH
+            paths:
+              - /api/v1/fraud/alerts
+              - /api/v1/fraud/alerts/*

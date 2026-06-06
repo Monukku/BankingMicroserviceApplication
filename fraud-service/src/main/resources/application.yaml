@@ -47,7 +47,7 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
 
   security:
     oauth2:
@@ -84,8 +84,12 @@ management:
     tracing:
       endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
 
+fraud:
+  alert:
+    threshold: 80   # minimum score to raise a fraud alert (0-100)
+
 logging:
   level:
-    com.rewabank: DEBUG
+    com.rewabank: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"

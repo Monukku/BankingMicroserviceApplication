@@ -8,6 +8,12 @@ spring:
   application:
     name: audit-ms
 
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+        default-page-size: 50
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://audit-db.banking.svc.cluster.local:5432/audit_db}
     username: ${DB_USERNAME:audit_user}
@@ -36,7 +42,7 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
 
   security:
     oauth2:
@@ -69,7 +75,7 @@ management:
 
 logging:
   level:
-    com.rewabank: DEBUG
+    com.rewabank: INFO
     org.springframework.kafka: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"

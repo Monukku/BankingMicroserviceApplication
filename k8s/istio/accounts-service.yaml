@@ -1,0 +1,102 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: accounts-ms-vs
+  namespace: banking
+spec:
+  hosts:
+    - accounts-service.banking.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/accounts
+      timeout: 10s
+      retries:
+        attempts: 2
+        retryOn: gateway-error,reset
+        perTryTimeout: 5s
+      route:
+        - destination:
+            host: accounts-service.banking.svc.cluster.local
+            port:
+              number: 8081
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: accounts-ms-dr
+  namespace: banking
+spec:
+  host: accounts-service.banking.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http2MaxRequests: 1000
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: accounts-ms-mtls
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: accounts-ms
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    "8081":
+      mode: PERMISSIVE
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: accounts-ms-policy
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app: accounts-ms
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/api-gateway-sa"
+      to:
+        - operation:
+            methods: ["GET","POST","PATCH"]
+            paths: ["/api/v1/accounts/*"]
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/transactions-ms-sa"
+      to:
+        - operation:
+            methods: ["PATCH"]
+            paths:
+              - "/api/v1/accounts/*/credit"
+              - "/api/v1/accounts/*/debit"
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/loans-ms-sa"
+      to:
+        - operation:
+            methods: ["PATCH"]
+            paths: ["/api/v1/accounts/*/credit"]
+    - from:
+        - source:
+            namespaces: ["monitoring"]
+      to:
+        - operation:
+            paths: ["/actuator/health", "/actuator/prometheus"]

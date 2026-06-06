@@ -8,13 +8,21 @@ spring:
   application:
     name: loans-ms
 
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+        default-page-size: 20
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/loans_db}
     username: ${DB_USERNAME:loans_user}
     password: ${DB_PASSWORD}
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      keepalive-time: 30000
 
   jpa:
     hibernate:
@@ -64,14 +72,14 @@ resilience4j:
   circuitbreaker:
     instances:
       accounts-service:
-        sliding-window-size: 10
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 10s
+        sliding-window-size: ${CB_SLIDING_WINDOW:10}
+        failure-rate-threshold: ${CB_FAILURE_RATE:50}
+        wait-duration-in-open-state: ${CB_WAIT_DURATION:10s}
         permitted-number-of-calls-in-half-open-state: 2
   timelimiter:
     instances:
       accounts-service:
-        timeout-duration: 5s
+        timeout-duration: ${CB_TIMEOUT:5s}
 
 management:
   endpoints:
@@ -99,7 +107,7 @@ management:
 
 logging:
   level:
-    com.rewabank: DEBUG
+    com.rewabank: INFO
     org.springframework.security: INFO
   pattern:
     level: "%5p[${spring.application.name},%X{traceId},%X{spanId}]"

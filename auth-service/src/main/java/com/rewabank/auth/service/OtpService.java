@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,17 +27,24 @@ public class OtpService {
     private final OtpRecordRepository    otpRecordRepository;
     private final BankingUserRepository  bankingUserRepository;
     private final StringRedisTemplate    redisTemplate;
+    private final PasswordEncoder        passwordEncoder;
 
-    private final BCryptPasswordEncoder  passwordEncoder = new BCryptPasswordEncoder(10);
     private final SecureRandom           secureRandom    = new SecureRandom();
 
-    private static final int OTP_EXPIRY_SECONDS  = 300;   // 5 minutes
-    private static final int MAX_OTP_ATTEMPTS    = 3;
     private static final String OTP_LOCK_PREFIX  = "otp:lock:";
     private static final String OTP_RATE_PREFIX  = "otp:rate:";
 
     @Value("${otp.expiry-seconds:300}")
     private int otpExpirySeconds;
+
+    @Value("${otp.max-attempts:3}")
+    private int maxOtpAttempts;
+
+    @Value("${otp.rate-window-minutes:10}")
+    private int rateWindowMinutes;
+
+    @Value("${otp.lock-minutes:15}")
+    private int lockMinutes;
 
     @Transactional
     public OtpResponse generateOtp(String keycloakUserId, OtpRequest request) {
@@ -48,8 +55,9 @@ public class OtpService {
         // Rate limit: max 3 OTPs per 10 minutes per purpose
         String rateKey = OTP_RATE_PREFIX + user.getId() + ":" + request.purpose();
         String rateCount = redisTemplate.opsForValue().get(rateKey);
-        if (rateCount != null && Integer.parseInt(rateCount) >= 3) {
-            throw new AuthException("AUTH_004", "Too many OTP requests. Please wait 10 minutes.");
+        if (rateCount != null && Integer.parseInt(rateCount) >= maxOtpAttempts) {
+            throw new AuthException("AUTH_004",
+                    "Too many OTP requests. Please wait " + rateWindowMinutes + " minutes.");
         }
 
         // OTP lock check
@@ -76,7 +84,7 @@ public class OtpService {
 
         // Increment rate limit counter
         redisTemplate.opsForValue().increment(rateKey);
-        redisTemplate.expire(rateKey, Duration.ofMinutes(10));
+        redisTemplate.expire(rateKey, Duration.ofMinutes(rateWindowMinutes));
 
         // In production: send OTP via SMS/Email (Notifications MS handles this via Kafka)
         // Here we only log at DEBUG — never log OTP in production INFO/WARN
@@ -103,10 +111,10 @@ public class OtpService {
         if (!passwordEncoder.matches(otp, record.getOtpHash())) {
             // Increment failed attempts
             user.setFailedOtpAttempts(user.getFailedOtpAttempts() + 1);
-            if (user.getFailedOtpAttempts() >= MAX_OTP_ATTEMPTS) {
-                user.setOtpLockedUntil(LocalDateTime.now().plusMinutes(15));
-                log.warn("User {} locked for 15 minutes after {} failed OTP attempts",
-                        user.getId(), MAX_OTP_ATTEMPTS);
+            if (user.getFailedOtpAttempts() >= maxOtpAttempts) {
+                user.setOtpLockedUntil(LocalDateTime.now().plusMinutes(lockMinutes));
+                log.warn("User {} locked for {} minutes after {} failed OTP attempts",
+                        user.getId(), lockMinutes, maxOtpAttempts);
             }
             bankingUserRepository.save(user);
             throw new AuthException("AUTH_007", "Invalid OTP");

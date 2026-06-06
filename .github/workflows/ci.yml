@@ -1,0 +1,406 @@
+name: RewaBank CI/CD
+
+on:
+  push:
+    branches: [ "master", "main", "feature/**", "fix/**" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+env:
+  JAVA_VERSION: "21"
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/rewabank
+
+# Cancel in-progress runs on same branch (saves runner minutes)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Detect changed services ──────────────────────────────────────────────────
+  # Only builds services whose files actually changed.
+  # On main branch — always builds all services for safety.
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.filter.outputs.changes }}
+      any_changed: ${{ steps.filter.outputs.any_changed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect changed services
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            accounts-service:
+              - 'accounts-service/**'
+              - 'rewabank-bom/**'
+            api-gateway:
+              - 'apigateway/**'
+              - 'rewabank-bom/**'
+            audit-service:
+              - 'audit-service/**'
+              - 'rewabank-bom/**'
+            auth-service:
+              - 'authms/**'
+              - 'rewabank-bom/**'
+            cards-service:
+              - 'cards-service/**'
+              - 'rewabank-bom/**'
+            customers-service:
+              - 'customerms/**'
+              - 'rewabank-bom/**'
+            fraud-service:
+              - 'fraudms/**'
+              - 'rewabank-bom/**'
+            loans-service:
+              - 'loans-service/**'
+              - 'rewabank-bom/**'
+            notifications-service:
+              - 'notificationms/**'
+              - 'rewabank-bom/**'
+            transactions-service:
+              - 'transaction-service/**'
+              - 'rewabank-bom/**'
+
+  # ── Build & Test ─────────────────────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    # On feature branches: only changed services
+    # On main/master: always run all
+    if: |
+      github.ref == 'refs/heads/master' ||
+      github.ref == 'refs/heads/main' ||
+      needs.detect-changes.outputs.any_changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: accounts-service
+            dir: accounts-service
+          - service: api-gateway
+            dir: apigateway
+          - service: audit-service
+            dir: audit-service
+          - service: auth-service
+            dir: authms
+          - service: cards-service
+            dir: cards-service
+          - service: customers-service
+            dir: customerms
+          - service: fraud-service
+            dir: fraudms
+          - service: loans-service
+            dir: loans-service
+          - service: notifications-service
+            dir: notificationms
+          - service: transactions-service
+            dir: transaction-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Install BOM
+        run: mvn -f rewabank-bom/pom.xml install -q
+
+      - name: Build & Test — ${{ matrix.service }}
+        run: mvn -f ${{ matrix.dir }}/pom.xml verify -q
+
+      # Cache the built JAR for Docker job — avoids rebuilding
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jar-${{ matrix.service }}
+          path: ${{ matrix.dir }}/target/*.jar
+          retention-days: 1
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ matrix.service }}
+          path: ${{ matrix.dir }}/target/surefire-reports/
+          retention-days: 7
+
+  # ── Docker Build & Push ───────────────────────────────────────────────────────
+  docker-build:
+    name: Docker — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: accounts-service
+            dir: accounts-service
+            deploy: accounts-ms
+          - service: api-gateway
+            dir: apigateway
+            deploy: api-gateway
+          - service: audit-service
+            dir: audit-service
+            deploy: audit-ms
+          - service: auth-service
+            dir: authms
+            deploy: auth-ms
+          - service: cards-service
+            dir: cards-service
+            deploy: cards-ms
+          - service: customers-service
+            dir: customerms
+            deploy: customers-ms
+          - service: fraud-service
+            dir: fraudms
+            deploy: fraud-ms
+          - service: loans-service
+            dir: loans-service
+            deploy: loans-ms
+          - service: notifications-service
+            dir: notificationms
+            deploy: notifications-ms
+          - service: transactions-service
+            dir: transaction-service
+            deploy: transactions-ms
+
+    outputs:
+      # Pass the short SHA to deploy job
+      short-sha: ${{ steps.sha.outputs.short }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # Download JAR built in previous job — no Maven needed here
+      - name: Download JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: jar-${{ matrix.service }}
+          path: ${{ matrix.dir }}/target/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.dir }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Layer cache — significantly speeds up builds
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          # BuildKit optimizations
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+  # ── Deploy to Kubernetes ─────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to K8s
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: read
+    environment:
+      name: production
+      url: http://your-cluster-url  # update this
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify cluster connection
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # Apply only app manifests — NOT infra (infra is managed separately)
+      - name: Apply Istio resources
+        run: kubectl apply -f k8s/istio/
+
+      - name: Apply app manifests
+        run: |
+          kubectl apply -f k8s/apps/
+          echo "✅ App manifests applied"
+
+      - name: Update image tags
+        env:
+          SHORT_SHA: ${{ steps.sha.outputs.short }}
+          OWNER: ${{ github.repository_owner }}
+          REGISTRY: ${{ env.REGISTRY }}
+        run: |
+          declare -A services=(
+            [accounts-ms]="accounts-service"
+            [api-gateway]="api-gateway"
+            [audit-ms]="audit-service"
+            [auth-ms]="auth-service"
+            [cards-ms]="cards-service"
+            [customers-ms]="customers-service"
+            [fraud-ms]="fraud-service"
+            [loans-ms]="loans-service"
+            [notifications-ms]="notifications-service"
+            [transactions-ms]="transactions-service"
+          )
+
+          FAILED=0
+          for deploy in "${!services[@]}"; do
+            svc="${services[$deploy]}"
+            image="${REGISTRY}/${OWNER}/rewabank/${svc}:${SHORT_SHA}"
+            echo "🔄 Updating ${deploy} → ${image}"
+            if ! kubectl set image deployment/${deploy} ${deploy}=${image} -n banking; then
+              echo "❌ Failed to update ${deploy}"
+              FAILED=1
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            echo "❌ One or more image updates failed"
+            exit 1
+          fi
+
+      - name: Wait for rollouts
+        run: |
+          FAILED=0
+          for deploy in accounts-ms api-gateway audit-ms auth-ms cards-ms customers-ms fraud-ms loans-ms notifications-ms transactions-ms; do
+            echo "⏳ Waiting for ${deploy}..."
+            if ! kubectl rollout status deployment/${deploy} -n banking --timeout=300s; then
+              echo "❌ Rollout failed: ${deploy}"
+              # Rollback this deployment
+              kubectl rollout undo deployment/${deploy} -n banking
+              echo "⏮️ Rolled back: ${deploy}"
+              FAILED=1
+            else
+              echo "✅ ${deploy} ready"
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            echo "❌ One or more rollouts failed — rolled back"
+            exit 1
+          fi
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "=============================="
+          echo "  DEPLOYMENT SUMMARY"
+          echo "=============================="
+          kubectl get deployments -n banking -o wide
+          echo ""
+          kubectl get pods -n banking
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "🚨 Deployment failed for commit ${{ github.sha }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Actor: ${{ github.actor }}"
+          # Add Slack/Teams webhook call here if needed
+
+  # ── Security Scan ─────────────────────────────────────────────────────────────
+  security-scan:
+    name: OWASP Security Scan
+    runs-on: ubuntu-latest
+    # Run in parallel with build — doesn't block deploy
+    needs: detect-changes
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Install BOM
+        run: mvn -f rewabank-bom/pom.xml install -q
+
+      - name: OWASP Dependency Check
+        run: |
+          mvn org.owasp:dependency-check-maven:aggregate \
+            -DfailBuildOnCVSS=9 \
+            -Dformats=HTML,JSON \
+            -DassemblyAnalyzerEnabled=false \
+            --fail-at-end || true
+
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-report-${{ github.run_number }}
+          path: "**/dependency-check-report.*"
+          retention-days: 30
+
+  # ── PR Quality Gate ───────────────────────────────────────────────────────────
+  # Blocks merge if any build fails — set this as required check in GitHub
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [ build-and-test, security-scan ]
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [ "${{ needs.build-and-test.result }}" != "success" ]; then
+            echo "❌ Build/Test failed"
+            exit 1
+          fi
+          if [ "${{ needs.security-scan.result }}" == "failure" ]; then
+            echo "❌ Security scan failed"
+            exit 1
+          fi
+          echo "✅ All quality checks passed"

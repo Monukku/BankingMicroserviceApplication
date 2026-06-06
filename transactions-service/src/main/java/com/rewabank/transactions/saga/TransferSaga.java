@@ -108,14 +108,13 @@ public class TransferSaga {
             log.info("Debit completed — txn: {}", transaction.getId());
         } catch (Exception e) {
             // Debit failed — no compensation needed, mark failed
+            String errMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             transaction.setStatus(Transaction.TransactionStatus.FAILED);
-            transaction.setFailureReason("Debit failed: " + e.getMessage());
+            transaction.setFailureReason("Debit failed: " + errMsg);
             transactionRepository.save(transaction);
             saveOutbox(transaction, "TRANSACTION_FAILED", TOPIC_FAILED);
-            log.error("Debit FAILED — txn: {} error: {}",
-                    transaction.getId(), e.getMessage());
-            throw new TransactionException("TXN_004",
-                    "Debit failed: " + e.getMessage());
+            log.error("Debit FAILED — txn: {} error: {}", transaction.getId(), errMsg);
+            throw new TransactionException("TXN_004", "Debit failed: " + errMsg);
         }
 
         // ── Step 3: Credit destination account ───────────────────────────────
@@ -131,16 +130,24 @@ public class TransferSaga {
             transaction.setCreditCompleted(true);
             log.info("Credit completed — txn: {}", transaction.getId());
         } catch (Exception e) {
-            // Credit failed — COMPENSATE: reverse the debit
-            log.error("Credit FAILED — compensating debit for txn: {}",
-                    transaction.getId());
+            String errMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            log.error("Credit FAILED — compensating debit for txn: {}", transaction.getId());
             compensateDebit(transaction);
             throw new TransactionException("TXN_005",
-                    "Credit failed, debit has been reversed: " + e.getMessage());
+                    "Credit failed, debit has been reversed: " + errMsg);
         }
 
         // ── Step 4: Create ledger entries (double-entry) ──────────────────────
-        createLedgerEntries(transaction);
+        // If this fails after money has moved, both sides must be compensated.
+        try {
+            createLedgerEntries(transaction);
+        } catch (Exception e) {
+            log.error("CRITICAL: Ledger creation failed after debit+credit succeeded for txn: {} — compensating full transfer",
+                    transaction.getId(), e);
+            compensateFullTransfer(transaction);
+            throw new TransactionException("TXN_006",
+                    "Transfer reversed: ledger creation failed after money moved. Error: " + e.getMessage());
+        }
 
         // ── Step 5: Mark completed + save outbox ─────────────────────────────
         transaction.setStatus(Transaction.TransactionStatus.COMPLETED);
@@ -183,6 +190,57 @@ public class TransferSaga {
             transactionRepository.save(transaction);
             log.error("CRITICAL: Compensation failed for txn: {} — manual intervention required",
                     transaction.getId());
+        }
+    }
+
+    // Full reversal when ledger fails after both debit AND credit succeeded.
+    // Unlike compensateDebit (credit-failure path), here we must reverse both sides.
+    // The DB transaction will be rolled back by Spring — the critical work is the Feign calls.
+    private void compensateFullTransfer(Transaction transaction) {
+        boolean creditReversed = false;
+        boolean debitReversed  = false;
+
+        // Reverse credit: debit the destination back
+        try {
+            accountsClient.debitAccount(
+                    transaction.getDestinationAccountId(),
+                    new AccountDebitCreditRequest(
+                            transaction.getDestinationAccountId(),
+                            transaction.getAmount(),
+                            transaction.getId().toString()
+                    )
+            );
+            creditReversed = true;
+            log.info("Full-compensation: destination debited (credit reversed) for txn: {}",
+                    transaction.getId());
+        } catch (Exception e) {
+            log.error("CRITICAL: Failed to reverse credit (debit destination) for txn: {} error: {}",
+                    transaction.getId(), e.getMessage());
+        }
+
+        // Reverse debit: credit the source back
+        try {
+            accountsClient.creditAccount(
+                    transaction.getSourceAccountId(),
+                    new AccountDebitCreditRequest(
+                            transaction.getSourceAccountId(),
+                            transaction.getAmount(),
+                            transaction.getId().toString()
+                    )
+            );
+            debitReversed = true;
+            log.info("Full-compensation: source credited (debit reversed) for txn: {}",
+                    transaction.getId());
+        } catch (Exception e) {
+            log.error("CRITICAL: Failed to reverse debit (credit source) for txn: {} error: {}",
+                    transaction.getId(), e.getMessage());
+        }
+
+        if (!creditReversed || !debitReversed) {
+            log.error("CRITICAL: Partial compensation for txn: {} creditReversed={} debitReversed={}" +
+                            " — manual reconciliation required. source={} dest={}",
+                    transaction.getId(), creditReversed, debitReversed,
+                    transaction.getSourceAccountId(), transaction.getDestinationAccountId());
         }
     }
 

@@ -1,6 +1,8 @@
 package com.rewabank.fraud.service;
 
 import com.rewabank.fraud.model.FraudRule;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -30,6 +32,7 @@ import java.util.UUID;
 public class FraudScoringService {
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final MeterRegistry meterRegistry;
 
     // Redis key prefixes
     private static final String VELOCITY_KEY   = "fraud:velocity:";
@@ -48,6 +51,7 @@ public class FraudScoringService {
      */
     public ScoringResult score(UUID accountId, BigDecimal amount,
                                String transactionType, String correlationId) {
+        Timer.Sample timerSample = Timer.start(meterRegistry);
         long startMs = System.currentTimeMillis();
         List<String> triggeredRules = new ArrayList<>();
         int totalScore = 0;
@@ -94,11 +98,17 @@ public class FraudScoringService {
         recordTransaction(accountId, amount);
 
         long elapsed = System.currentTimeMillis() - startMs;
+
+        timerSample.stop(Timer.builder("fraud.scoring.duration")
+                .description("Time to score a transaction for fraud")
+                .tag("action", action)
+                .register(meterRegistry));
+
         log.debug("Fraud score for account: {} score: {} action: {} rules: {} elapsed: {}ms",
                 accountId, totalScore, action, triggeredRules, elapsed);
 
         if (elapsed > 100) {
-            log.warn("Fraud scoring exceeded 100ms: {}ms for account: {}",
+            log.warn("Fraud scoring exceeded SLA 100ms: {}ms for account: {}",
                     elapsed, accountId);
         }
 

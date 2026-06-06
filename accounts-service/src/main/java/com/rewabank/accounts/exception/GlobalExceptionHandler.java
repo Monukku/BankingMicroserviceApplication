@@ -1,6 +1,7 @@
 package com.rewabank.accounts.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -64,6 +65,19 @@ public class GlobalExceptionHandler {
                 "message",     "Validation failed",
                 "fieldErrors", errors,
                 "path",        request.getDescription(false).replace("uri=", "")
+        ));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrity(
+            DataIntegrityViolationException ex, WebRequest request) {
+        log.warn("DataIntegrityViolation: {}", ex.getMostSpecificCause().getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "timestamp", LocalDateTime.now().toString(),
+                "status",    409,
+                "errorCode", "ACCT_CONFLICT",
+                "message",   "Request conflicts with existing data",
+                "path",      request.getDescription(false).replace("uri=", "")
         ));
     }
 

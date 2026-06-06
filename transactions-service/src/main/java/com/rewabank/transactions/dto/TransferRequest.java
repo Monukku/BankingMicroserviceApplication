@@ -30,5 +30,13 @@ public record TransferRequest(
         String remarks,
 
         // X-Device-Id header value — for fraud context
+        @Size(max = 255, message = "Device ID max 255 characters")
         String deviceId
-) {}
+
+) {
+    @AssertTrue(message = "Source and destination accounts must be different")
+    public boolean isDifferentAccounts() {
+        return sourceAccountId == null || destinationAccountId == null
+                || !sourceAccountId.equals(destinationAccountId);
+    }
+}

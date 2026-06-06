@@ -29,7 +29,8 @@ public class KafkaConsumerConfig {
                 StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
                 JsonDeserializer.class);
-        props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
+        props.put(JsonDeserializer.TRUSTED_PACKAGES,
+                "com.rewabank,java.util,java.time,java.math");
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         // Manual ACK — only commit after successful processing
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
