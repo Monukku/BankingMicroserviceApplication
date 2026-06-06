@@ -9,6 +9,7 @@
 *.iml
 .vscode/
 *.swp
+*.suo
 
 # OS files
 .DS_Store
@@ -17,3 +18,19 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Spring Boot
+application-local.yml
+application-local.properties
+
+# Docker
+.dockerignore
+
+# K8s sensitive files
+kubeconfig
+*.kubeconfig
+
+# Environment files
+.env
+.env.local
+*.env

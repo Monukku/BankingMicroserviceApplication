@@ -24,12 +24,24 @@ public class RequestTraceFilter implements GlobalFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         HttpHeaders requestHeaders = exchange.getRequest().getHeaders();
+<<<<<<< HEAD:api-gateway/src/main/java/com/rewabank/gateway/filter/RequestTraceFilter.java
         if (filterUtility.getCorrelationId(requestHeaders) != null) {
             logger.debug("rewabank-correlation-id found: {}", filterUtility.getCorrelationId(requestHeaders));
         } else {
             String correlationId = UUID.randomUUID().toString();
             exchange = filterUtility.setCorrelationId(exchange, correlationId);
             logger.debug("rewabank-correlation-id generated: {}", correlationId);
+=======
+        String correlationId;
+        if (isCorrelationIdPresent(requestHeaders)) {
+            logger.debug("rewabank-correlation-Id found in RequestTraceFilter:{}", filterUtility.getCorrelationId(requestHeaders));
+            filterUtility.getCorrelationId(requestHeaders);
+        } else {
+
+            correlationId = generateCorrelationId();
+            filterUtility.setCorrelationId(exchange, correlationId);
+            logger.debug("rewabank-correlation-Id is generated in RequestTraceFilter:{}", correlationId);
+>>>>>>> origin/master:apigateway/src/main/java/com/gateway/apigateway/Filter/RequestTraceFilter.java
         }
         return chain.filter(exchange);
     }

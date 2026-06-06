@@ -31,7 +31,7 @@ public class CardsDto {
     @Schema(
             description = "Card Number of the customer", example = "100646930341"
     )
-    private String cardNumber;
+    private Long cardNumber;
 
     @NotEmpty(message = "CardType can not be a null or empty")
     @Schema(
@@ -56,5 +56,7 @@ public class CardsDto {
             description = "Total available amount against a card", example = "90000"
     )
     private int availableAmount;
+
+    private boolean activeSw;
 
 }
