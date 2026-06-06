@@ -1,12 +1,24 @@
 package com.rewabank.notifications.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class NotificationDispatcherTest {
 
     private final NotificationDispatcher dispatcher = new NotificationDispatcher();
+
+    @BeforeEach
+    void setUp() {
+        // @Value fields are not injected when using new NotificationDispatcher()
+        // Set simulationMode=true so dispatcher logs only and returns true
+        ReflectionTestUtils.setField(dispatcher, "simulationMode", true);
+        ReflectionTestUtils.setField(dispatcher, "smsProvider",   "log");
+        ReflectionTestUtils.setField(dispatcher, "emailProvider", "log");
+        ReflectionTestUtils.setField(dispatcher, "pushProvider",  "log");
+    }
 
     @Test
     void sendSms_returnsTrue() {
