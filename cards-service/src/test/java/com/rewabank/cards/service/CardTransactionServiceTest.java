@@ -70,9 +70,9 @@ class CardTransactionServiceTest {
                 .build();
 
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
-        // Fraud client returns approved by default
-        when(fraudFeignClient.validateTransaction(any()))
-                .thenReturn(Map.of("approved", true, "fraudScore", 5));
+        // Fraud client returns ALLOW by default
+        when(fraudFeignClient.getScore(any(), any(), anyString(), anyString()))
+                .thenReturn(Map.of("score", 5, "action", "ALLOW"));
     }
 
     private CardTransaction pendingTxn(UUID id) {
@@ -264,6 +264,21 @@ class CardTransactionServiceTest {
         assertThatThrownBy(() -> cardTransactionService.authorizeTransaction(txnId))
                 .isInstanceOf(CardException.class)
                 .hasMessageContaining("International transactions not enabled");
+    }
+
+    @Test
+    void authorizeTransaction_fraudBlocked_throws() {
+        when(fraudFeignClient.getScore(any(), any(), anyString(), anyString()))
+                .thenReturn(Map.of("score", 95, "action", "BLOCK", "reason", "Suspicious pattern"));
+
+        CardTransaction txn = pendingTxn(txnId);
+        when(transactionRepository.findById(txnId)).thenReturn(Optional.of(txn));
+        when(cardRepository.findById(cardId)).thenReturn(Optional.of(activeCard));
+        when(transactionRepository.findByCardId(cardId)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> cardTransactionService.authorizeTransaction(txnId))
+                .isInstanceOf(CardException.class)
+                .hasMessageContaining("fraud");
     }
 
     @Test

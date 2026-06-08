@@ -243,41 +243,26 @@ public class CardTransactionService {
     }
 
     /**
-     * Validate transaction against fraud patterns
+     * Validate transaction against fraud patterns.
+     * Fails hard — a down fraud-ms means no transaction approval (fail-secure).
      */
     private void validateFraud(CardTransaction transaction, Card card) {
-        try {
-            var fraudRequest = new FraudFeignClient.TransactionValidationRequest(
-                    card.getId(),
-                    card.getCustomerId(),
-                    transaction.getAmount(),
-                    transaction.getCurrency(),
-                    transaction.getMerchantName() != null ? transaction.getMerchantName() : "UNKNOWN",
-                    transaction.getTransactionType().name(),
-                    transaction.getIsInternational(),
-                    transaction.getChannel() != null ? transaction.getChannel().name() : "UNKNOWN"
-            );
+        var fraudResponse = fraudFeignClient.getScore(
+                card.getAccountId(),
+                transaction.getAmount(),
+                transaction.getTransactionType().name(),
+                transaction.getId().toString());
 
-            var fraudResponse = fraudFeignClient.validateTransaction(fraudRequest);
-            
-            @SuppressWarnings("unchecked")
-            Boolean approved = (Boolean) fraudResponse.getOrDefault("approved", true);
-            
-            if (!approved) {
-                String reason = (String) fraudResponse.getOrDefault("reason", "Fraud check failed");
-                log.warn("Transaction {} failed fraud check: {}", transaction.getId(), reason);
-                throw new CardException("FRAUD_DETECTED", "Transaction declined by fraud detection: " + reason);
-            }
+        Integer score = ((Number) fraudResponse.getOrDefault("score", 0)).intValue();
+        transaction.setFraudScore(score);
 
-            Integer fraudScore = ((Number) fraudResponse.getOrDefault("fraudScore", 0)).intValue();
-            transaction.setFraudScore(fraudScore);
-            log.info("Transaction {} fraud score: {}", transaction.getId(), fraudScore);
+        String action = (String) fraudResponse.getOrDefault("action", "ALLOW");
+        log.info("Transaction {} fraud score: {} action: {}", transaction.getId(), score, action);
 
-        } catch (Exception e) {
-            // Log but don't fail - fraud-ms might be down
-            log.warn("Could not validate fraud for transaction: {}", transaction.getId(), e);
-            // In production, decide if you want to fail or allow with warning
-            // For now, we log and continue
+        if ("BLOCK".equals(action) || "DECLINE".equals(action)) {
+            String reason = fraudResponse.getOrDefault("reason", "Fraud check failed").toString();
+            log.warn("Transaction {} blocked by fraud: {}", transaction.getId(), reason);
+            throw new CardException("FRAUD_DETECTED", "Transaction declined by fraud detection: " + reason);
         }
     }
 

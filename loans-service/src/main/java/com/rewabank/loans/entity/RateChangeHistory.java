@@ -16,7 +16,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-class RateChangeHistory {
+public class RateChangeHistory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

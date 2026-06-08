@@ -14,7 +14,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-class LoanDocument {
+public class LoanDocument {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

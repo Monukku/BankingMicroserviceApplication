@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -48,13 +48,13 @@ class CardControllerIntegrationTest {
     @Autowired
     private CardRepository cardRepository;
 
-    @MockBean
+    @MockitoBean
     private AccountsFeignClient accountsFeignClient;
 
-    @MockBean
+    @MockitoBean
     private CardTransactionService transactionService;
 
-    @MockBean
+    @MockitoBean
     private FraudEventConsumer fraudEventConsumer;
 
     private Card savedCard;
