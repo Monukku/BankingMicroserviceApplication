@@ -18,6 +18,8 @@ public record LoanApplicationResponse(
         String purpose,
         String rejectionReason,
         String reviewNotes,
+        Integer fraudScore,
+        String fraudAction,
         LocalDateTime appliedAt,
         LocalDateTime approvedAt,
         LocalDateTime disbursedAt,

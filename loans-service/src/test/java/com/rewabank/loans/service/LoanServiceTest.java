@@ -3,6 +3,7 @@ package com.rewabank.loans.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rewabank.loans.client.AccountsFeignClient;
+import com.rewabank.loans.client.FraudFeignClient;
 import com.rewabank.loans.dto.LoanApplicationRequest;
 import com.rewabank.loans.dto.LoanApplicationResponse;
 import com.rewabank.loans.dto.LoanReviewRequest;
@@ -21,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +39,7 @@ class LoanServiceTest {
     @Mock LoanApplicationRepository loanRepository;
     @Mock OutboxEventRepository      outboxRepository;
     @Mock AccountsFeignClient        accountsClient;
+    @Mock FraudFeignClient           fraudClient;
     @Mock ObjectMapper               objectMapper;
 
     @InjectMocks LoanService loanService;
@@ -64,6 +67,10 @@ class LoanServiceTest {
 
         // allow outbox serialization in all tests
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+        // default fraud response — ALLOW with score 0
+        when(fraudClient.getScore(any(), any(), any(), any()))
+                .thenReturn(Map.of("score", 0, "action", "ALLOW", "reason", "clean"));
     }
 
     // ── apply ────────────────────────────────────────────────────
@@ -359,5 +366,66 @@ class LoanServiceTest {
                 .thenReturn(List.of());
 
         assertThat(loanService.getMyLoans("kc-user-1")).isEmpty();
+    }
+
+    // ── fraud check on apply ─────────────────────────────────────
+
+    @Test
+    void apply_fraudBlock_autoRejectsWithException() {
+        when(fraudClient.getScore(any(), any(), any(), any()))
+                .thenReturn(Map.of("score", 95, "action", "BLOCK", "reason", "velocity"));
+
+        LoanApplicationRequest req = new LoanApplicationRequest(
+                accountId, LoanApplication.LoanType.PERSONAL,
+                new BigDecimal("500000"), 24, "Home renovation");
+
+        assertThatThrownBy(() -> loanService.apply("kc-user-1", req))
+                .isInstanceOf(LoanException.class)
+                .hasMessageContaining("fraud risk");
+
+        verify(loanRepository, never()).save(any());
+        verify(outboxRepository, never()).save(any());
+    }
+
+    @Test
+    void apply_fraudReview_storesFraudScoreAndContinues() {
+        when(fraudClient.getScore(any(), any(), any(), any()))
+                .thenReturn(Map.of("score", 65, "action", "REVIEW", "reason", "large amount"));
+        when(loanRepository.save(any(LoanApplication.class)))
+                .thenAnswer(inv -> {
+                    LoanApplication l = inv.getArgument(0);
+                    if (l.getId() == null) l.setId(UUID.randomUUID());
+                    return l;
+                });
+
+        LoanApplicationRequest req = new LoanApplicationRequest(
+                accountId, LoanApplication.LoanType.PERSONAL,
+                new BigDecimal("500000"), 24, "Home renovation");
+
+        LoanApplicationResponse response = loanService.apply("kc-user-1", req);
+
+        assertThat(response.status()).isEqualTo(LoanApplication.LoanStatus.APPLIED);
+        assertThat(response.fraudScore()).isEqualTo(65);
+        assertThat(response.fraudAction()).isEqualTo("REVIEW");
+        verify(loanRepository).save(any(LoanApplication.class));
+    }
+
+    @Test
+    void apply_fraudAllow_storesFraudScore() {
+        when(loanRepository.save(any(LoanApplication.class)))
+                .thenAnswer(inv -> {
+                    LoanApplication l = inv.getArgument(0);
+                    if (l.getId() == null) l.setId(UUID.randomUUID());
+                    return l;
+                });
+
+        LoanApplicationRequest req = new LoanApplicationRequest(
+                accountId, LoanApplication.LoanType.HOME,
+                new BigDecimal("2000000"), 120, "Buy house");
+
+        LoanApplicationResponse response = loanService.apply("kc-user-1", req);
+
+        assertThat(response.fraudScore()).isEqualTo(0);
+        assertThat(response.fraudAction()).isEqualTo("ALLOW");
     }
 }

@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import java.util.Map;
 import java.util.UUID;
 
-@FeignClient(name = "notification-ms", url = "${feign.notification-ms.url:http://localhost:8094}")
+@FeignClient(name = "notification-ms", url = "${feign.notification-ms.url:http://localhost:9010}")
 public interface NotificationFeignClient {
 
     /**

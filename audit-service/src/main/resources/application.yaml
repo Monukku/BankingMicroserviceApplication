@@ -15,7 +15,7 @@ spring:
         default-page-size: 50
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://audit-db.banking.svc.cluster.local:5432/audit_db}
+    url: ${DB_URL:jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/audit_db}
     username: ${DB_USERNAME:audit_user}
     password: ${DB_PASSWORD}
     hikari:
@@ -35,7 +35,7 @@ spring:
     locations: classpath:db/migration
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-service.banking.svc.cluster.local:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-kafka-bootstrap.banking.svc.cluster.local:9092}
     consumer:
       group-id: audit-ms
       auto-offset-reset: earliest
@@ -48,7 +48,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak.keycloak.svc.cluster.local:8080/realms/rewabank/protocol/openid-connect/certs}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs}
 
 management:
   endpoints:

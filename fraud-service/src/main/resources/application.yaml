@@ -9,7 +9,7 @@ spring:
     name: fraud-ms
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://fraud-db.banking.svc.cluster.local:5432/fraud_db}
+    url: ${DB_URL:jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/fraud_db}
     username: ${DB_USERNAME:fraud_user}
     password: ${DB_PASSWORD}
     hikari:
@@ -30,13 +30,13 @@ spring:
 
   data:
     redis:
-      host: ${REDIS_HOST:redis-service.banking.svc.cluster.local}
+      host: ${REDIS_HOST:valkey.banking.svc.cluster.local}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD}
       timeout: 1s          # tight timeout — must score in <100ms
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-service.banking.svc.cluster.local:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-kafka-bootstrap.banking.svc.cluster.local:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -53,8 +53,8 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank}
-          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs}
 
 kafka:
   topics:

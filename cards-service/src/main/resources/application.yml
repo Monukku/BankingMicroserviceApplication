@@ -9,7 +9,7 @@ spring:
     name: cards-ms
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://postgresql.banking.svc.cluster.local:5432/cards_db}
+    url: ${DB_URL:jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/cards_db}
     username: ${DB_USERNAME:cards_user}
     password: ${DB_PASSWORD}
     hikari:
@@ -49,6 +49,16 @@ spring:
         jwt:
           jwk-set-uri: ${KEYCLOAK_JWKS_URI}
           issuer-uri: ${KEYCLOAK_ISSUER_URI}
+
+feign:
+  customers-ms:
+    url: ${CUSTOMERS_SERVICE_URL:http://customers-service.banking.svc.cluster.local:8080}
+  accounts-ms:
+    url: ${ACCOUNTS_SERVICE_URL:http://accounts-service.banking.svc.cluster.local:8081}
+  fraud-ms:
+    url: ${FRAUD_SERVICE_URL:http://fraud-service.banking.svc.cluster.local:8094}
+  notification-ms:
+    url: ${NOTIFICATIONS_SERVICE_URL:http://notifications-service.banking.svc.cluster.local:9010}
 
 encryption:
   aes-key: ${AES_ENCRYPTION_KEY}

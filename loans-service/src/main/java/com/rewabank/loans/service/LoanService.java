@@ -3,6 +3,7 @@ package com.rewabank.loans.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rewabank.loans.client.AccountsFeignClient;
+import com.rewabank.loans.client.FraudFeignClient;
 import com.rewabank.loans.dto.*;
 import com.rewabank.loans.entity.LoanApplication;
 import com.rewabank.loans.entity.OutboxEvent;
@@ -32,6 +33,7 @@ public class LoanService {
     private final LoanApplicationRepository loanRepository;
     private final OutboxEventRepository     outboxRepository;
     private final AccountsFeignClient       accountsClient;
+    private final FraudFeignClient          fraudClient;
     private final ObjectMapper              objectMapper;
 
     // Role-based approval limits
@@ -49,6 +51,24 @@ public class LoanService {
     @Transactional
     public LoanApplicationResponse apply(String keycloakUserId,
                                          LoanApplicationRequest request) {
+        // Fraud check at application time — auto-reject on BLOCK, store score for reviewers
+        Map<String, Object> fraudResult = fraudClient.getScore(
+                request.accountId(),
+                request.requestedAmount(),
+                "LOAN_APPLICATION",
+                UUID.randomUUID().toString()
+        );
+
+        int fraudScore  = ((Number) fraudResult.getOrDefault("score", 0)).intValue();
+        String fraudAction = String.valueOf(fraudResult.getOrDefault("action", "ALLOW"));
+
+        if ("BLOCK".equalsIgnoreCase(fraudAction)) {
+            log.warn("Loan application auto-rejected — fraud BLOCK for accountId: {} score: {}",
+                    request.accountId(), fraudScore);
+            throw new LoanException("LOAN_006",
+                    "Loan application declined due to fraud risk. Please contact your branch.");
+        }
+
         LoanApplication loan = LoanApplication.builder()
                 .keycloakUserId(keycloakUserId)
                 .accountId(request.accountId())
@@ -57,6 +77,8 @@ public class LoanService {
                 .tenureMonths(request.tenureMonths())
                 .purpose(request.purpose())
                 .status(LoanApplication.LoanStatus.APPLIED)
+                .fraudScore(fraudScore)
+                .fraudAction(fraudAction)
                 .appliedAt(LocalDateTime.now())
                 .build();
 
@@ -293,6 +315,7 @@ public class LoanService {
                 l.getLoanType(), l.getRequestedAmount(), l.getApprovedAmount(),
                 l.getInterestRate(), l.getTenureMonths(), l.getStatus(),
                 l.getPurpose(), l.getRejectionReason(), l.getReviewNotes(),
+                l.getFraudScore(), l.getFraudAction(),
                 l.getAppliedAt(), l.getApprovedAt(), l.getDisbursedAt(),
                 l.getCreatedAt()
         );

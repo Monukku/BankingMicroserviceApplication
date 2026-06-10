@@ -16,13 +16,13 @@ spring:
       resourceserver:
         jwt:
           # ← CHANGED: K8s DNS — keycloak service in keycloak namespace
-          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak.keycloak.svc.cluster.local:8080/realms/rewabank/protocol/openid-connect/certs}
-          issuer-uri:  ${KEYCLOAK_ISSUER_URI:http://keycloak.keycloak.svc.cluster.local:8080/realms/rewabank}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs}
+          issuer-uri:  ${KEYCLOAK_ISSUER_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank}
 
   data:
     redis:
       # ← CHANGED: K8s DNS
-      host: ${REDIS_HOST:redis-service.banking.svc.cluster.local}
+      host: ${REDIS_HOST:valkey.banking.svc.cluster.local}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD}   # injected from K8s Secret
       connect-timeout: 2s

@@ -61,6 +61,12 @@ public class LoanApplication {
     @Column(name = "review_notes", length = 500)
     private String reviewNotes;
 
+    @Column(name = "fraud_score")
+    private Integer fraudScore;
+
+    @Column(name = "fraud_action", length = 10)
+    private String fraudAction;
+
     @Column(name = "applied_at")
     private LocalDateTime appliedAt;
 

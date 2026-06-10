@@ -61,6 +61,14 @@ accounts:
   service:
     url: ${ACCOUNTS_SERVICE_URL:http://accounts-service.banking.svc.cluster.local:8081}
 
+customers:
+  service:
+    url: ${CUSTOMERS_SERVICE_URL:http://customers-service.banking.svc.cluster.local:8080}
+
+fraud:
+  service:
+    url: ${FRAUD_SERVICE_URL:http://fraud-service.banking.svc.cluster.local:8094}
+
 kafka:
   topics:
     loan-applied:   bank.loan.applied
@@ -76,10 +84,17 @@ resilience4j:
         failure-rate-threshold: ${CB_FAILURE_RATE:50}
         wait-duration-in-open-state: ${CB_WAIT_DURATION:10s}
         permitted-number-of-calls-in-half-open-state: 2
+      fraud-service:
+        sliding-window-size: 5
+        failure-rate-threshold: 30
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 2
   timelimiter:
     instances:
       accounts-service:
         timeout-duration: ${CB_TIMEOUT:5s}
+      fraud-service:
+        timeout-duration: 3s
 
 management:
   endpoints:

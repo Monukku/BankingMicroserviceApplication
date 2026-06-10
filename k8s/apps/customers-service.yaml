@@ -16,6 +16,7 @@ data:
   REDIS_HOST:        "valkey.banking.svc.cluster.local"
   KAFKA_BOOTSTRAP:   "kafka-kafka-bootstrap.banking.svc.cluster.local:9092"
   KEYCLOAK_JWKS_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs"
+  KEYCLOAK_ISSUER_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank"
   MINIO_URL:         "http://minio-service.banking.svc.cluster.local:9000"
 ---
 apiVersion: apps/v1
