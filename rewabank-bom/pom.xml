@@ -31,6 +31,7 @@
 		<jjwt.version>0.12.3</jjwt.version>
 		<guava.version>33.4.0-jre</guava.version>
 		<sonar.organization>monukku</sonar.organization>
+        <sonar.projectKey>Monukku_BankingMicroserviceApplication</sonar.projectKey>
 		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
 		<sonar.coverage.exclusions>
 			**/config/**,
@@ -146,14 +147,14 @@
 				<artifactId>sonar-maven-plugin</artifactId>
 				<version>3.10.0.2594</version>
 			</plugin>
-			<!-- JaCoCo — generates coverage report consumed by SonarCloud -->
+			<!-- JaCoCo â€” generates coverage report consumed by SonarCloud -->
 			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>0.8.11</version>
 				<configuration>
 					<excludes>
-						<!-- Config classes are wired by Spring — not meaningfully unit-testable -->
+						<!-- Config classes are wired by Spring â€” not meaningfully unit-testable -->
 						<exclude>**/config/**</exclude>
 						<!-- Application entry points -->
 						<exclude>**/*Application.class</exclude>
