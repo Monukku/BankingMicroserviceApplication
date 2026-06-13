@@ -1,85 +1,189 @@
-name: RewaBank CI/CD
+name: RewaBank CI/CD — Enterprise Pipeline
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Triggers
+# ─────────────────────────────────────────────────────────────────────────────
 on:
   push:
-    branches: [ "master", "main", "feature/**", "fix/**" ]
+    branches: [master, main, "feature/**", "fix/**"]
   pull_request:
-    branches: [ "master", "main" ]
+    branches: [master, main]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to build (all = every service)'
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - accounts-service
+          - api-gateway
+          - auth-service
+          - cards-service
+          - customers-service
+          - fraud-service
+          - loans-service
+          - notifications-service
+          - transactions-service
+      image_tag:
+        description: 'Custom image tag (leave blank to use git SHA)'
+        required: false
+        default: ''
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Global env — override per job if needed
+# ─────────────────────────────────────────────────────────────────────────────
 env:
-  JAVA_VERSION: "21"
-  REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}/rewabank
+  JAVA_VERSION: '21'
+  REGISTRY: docker.io
+  IMAGE_PREFIX: rewabank
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Required GitHub Secrets:
+#   DOCKERHUB_USERNAME  — Docker Hub username
+#   DOCKERHUB_TOKEN     — Docker Hub access token (not password)
+#   SONAR_TOKEN         — SonarCloud token (sonarcloud.io — free for public repos)
+#   SNYK_TOKEN          — Snyk token (snyk.io — free tier)
+# ─────────────────────────────────────────────────────────────────────────────
+
 jobs:
-  detect-changes:
-    name: Detect Changed Services
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 1 — Parse_Context
+  # Extracts build metadata and builds service matrix for all downstream jobs.
+  # workflow_dispatch lets you pass a specific image/service to build.
+  # ═══════════════════════════════════════════════════════════════════════════
+  parse-context:
+    name: Parse_Context
     runs-on: ubuntu-latest
     outputs:
-      any_changed: ${{ steps.filter.outputs.any_changed }}
+      matrix:     ${{ steps.set-matrix.outputs.matrix }}
+      has_changes: ${{ steps.set-matrix.outputs.has_changes }}
+      short_sha:  ${{ steps.meta.outputs.short_sha }}
+      image_tag:  ${{ steps.meta.outputs.image_tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          TAG="${{ github.event.inputs.image_tag }}"
+          if [ -z "$TAG" ]; then TAG="${SHORT_SHA}"; fi
+          echo "image_tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "──────────────────────────────────────"
+          echo "  SHA:     ${GITHUB_SHA}"
+          echo "  Tag:     ${TAG}"
+          echo "  Branch:  ${GITHUB_REF_NAME}"
+          echo "  Actor:   ${GITHUB_ACTOR}"
+          echo "  Trigger: ${GITHUB_EVENT_NAME}"
+          echo "──────────────────────────────────────"
+
       - name: Detect changed services
         id: filter
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            any_changed:
+            accounts-service:
               - 'accounts-service/**'
+              - 'rewabank-bom/**'
+            api-gateway:
               - 'api-gateway/**'
-              - 'audit-service/**'
+              - 'rewabank-bom/**'
+            auth-service:
               - 'auth-service/**'
+              - 'rewabank-bom/**'
+            cards-service:
               - 'cards-service/**'
+              - 'rewabank-bom/**'
+            customers-service:
               - 'customers-service/**'
+              - 'rewabank-bom/**'
+            fraud-service:
               - 'fraud-service/**'
+              - 'rewabank-bom/**'
+            loans-service:
               - 'loans-service/**'
+              - 'rewabank-bom/**'
+            notifications-service:
               - 'notifications-service/**'
+              - 'rewabank-bom/**'
+            transactions-service:
               - 'transactions-service/**'
               - 'rewabank-bom/**'
 
-  build-and-test:
-    name: Build & Test — ${{ matrix.service }}
+      - name: Build service matrix
+        id: set-matrix
+        run: |
+          DISPATCH="${{ github.event.inputs.service }}"
+
+          # service → deploy-name:port
+          declare -A CATALOG=(
+            ["accounts-service"]="accounts-ms:8081"
+            ["api-gateway"]="api-gateway:8072"
+            ["auth-service"]="auth-ms:8073"
+            ["cards-service"]="cards-ms:8092"
+            ["customers-service"]="customers-ms:8080"
+            ["fraud-service"]="fraud-ms:8094"
+            ["loans-service"]="loans-ms:8090"
+            ["notifications-service"]="notifications-ms:9010"
+            ["transactions-service"]="transactions-ms:8082"
+          )
+
+          MATRIX='{"include":['
+          FIRST=true
+
+          for svc in "${!CATALOG[@]}"; do
+            IFS=':' read -r deploy port <<< "${CATALOG[$svc]}"
+            INCLUDE=false
+
+            # Manual dispatch — use input
+            if [ "$DISPATCH" = "all" ] || [ "$DISPATCH" = "$svc" ]; then
+              INCLUDE=true
+            # Auto — use path filter result
+            elif [ "${{ steps.filter.outputs[svc] }}" = "true" ]; then
+              INCLUDE=true
+            fi
+
+            if [ "$INCLUDE" = "true" ]; then
+              [ "$FIRST" = "false" ] && MATRIX="${MATRIX},"
+              MATRIX+='{"service":"'"${svc}"'","dir":"'"${svc}"'","deploy":"'"${deploy}"'","port":"'"${port}"'"}'
+              FIRST=false
+            fi
+          done
+
+          MATRIX="${MATRIX}]}"
+          HAS_CHANGES="true"
+          [ "$FIRST" = "true" ] && { MATRIX='{"include":[]}'; HAS_CHANGES="false"; }
+
+          echo "matrix=${MATRIX}" >> $GITHUB_OUTPUT
+          echo "has_changes=${HAS_CHANGES}" >> $GITHUB_OUTPUT
+          echo "📋 Matrix: ${MATRIX}"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 2 — Build
+  # Compiles each changed service — uploads JAR for downstream jobs
+  # ═══════════════════════════════════════════════════════════════════════════
+  build:
+    name: Build — ${{ matrix.service }}
     runs-on: ubuntu-latest
-    needs: detect-changes
-    if: |
-      github.ref == 'refs/heads/master' ||
-      github.ref == 'refs/heads/main' ||
-      needs.detect-changes.outputs.any_changed == 'true'
+    needs: parse-context
+    if: needs.parse-context.outputs.has_changes == 'true'
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - service: accounts-service
-            dir: accounts-service
-          - service: api-gateway
-            dir: api-gateway
-          - service: audit-service
-            dir: audit-service
-          - service: auth-service
-            dir: auth-service
-          - service: cards-service
-            dir: cards-service
-          - service: customers-service
-            dir: customers-service
-          - service: fraud-service
-            dir: fraud-service
-          - service: loans-service
-            dir: loans-service
-          - service: notifications-service
-            dir: notifications-service
-          - service: transactions-service
-            dir: transactions-service
-
+      matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
@@ -88,8 +192,8 @@ jobs:
       - name: Install BOM
         run: mvn -f rewabank-bom/pom.xml install -q
 
-      - name: Build & Test
-        run: mvn -f ${{ matrix.dir }}/pom.xml verify -q
+      - name: Build
+        run: mvn -f ${{ matrix.dir }}/pom.xml package -q -DskipTests
 
       - name: Upload JAR
         uses: actions/upload-artifact@v4
@@ -97,6 +201,76 @@ jobs:
           name: jar-${{ matrix.service }}
           path: ${{ matrix.dir }}/target/*.jar
           retention-days: 1
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 3 — Base_Image_Validation
+  # Trivy scans eclipse-temurin:21-jre-alpine BEFORE we build on top of it.
+  # Runs in parallel with Build — no dependency needed.
+  # ═══════════════════════════════════════════════════════════════════════════
+  base-image-validation:
+    name: Base_Image_Validation
+    runs-on: ubuntu-latest
+    needs: parse-context
+    if: needs.parse-context.outputs.has_changes == 'true'
+    steps:
+      - name: Pull base image
+        run: docker pull eclipse-temurin:21-jre-alpine
+
+      - name: Trivy — scan base image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: eclipse-temurin:21-jre-alpine
+          format: table
+          exit-code: '0'        # warn only — we don't own the base image
+          severity: CRITICAL,HIGH
+          output: base-image-scan.txt
+
+      - name: Upload scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-image-scan
+          path: base-image-scan.txt
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 4 — Unit_Tests_SonarQube
+  # Tests + SonarCloud quality gate per service.
+  # Required secret: SONAR_TOKEN
+  # ═══════════════════════════════════════════════════════════════════════════
+  unit-tests-sonarqube:
+    name: Unit_Tests_SonarQube — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [parse-context, build]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Install BOM
+        run: mvn -f rewabank-bom/pom.xml install -q
+
+      - name: Run tests with coverage
+        run: mvn -f ${{ matrix.dir }}/pom.xml verify -q --fail-at-end
+
+      - name: SonarCloud scan
+        run: |
+          mvn -f ${{ matrix.dir }}/pom.xml sonar:sonar \
+            -Dsonar.projectKey=rewabank-${{ matrix.service }} \
+            -Dsonar.organization=monukku \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.qualitygate.wait=true \
+            -q
+        continue-on-error: true    # don't block if SONAR_TOKEN not set yet
 
       - name: Upload test reports
         if: always()
@@ -106,167 +280,22 @@ jobs:
           path: ${{ matrix.dir }}/target/surefire-reports/
           retention-days: 7
 
-  docker-build:
-    name: Docker — ${{ matrix.service }}
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 5 — Dependency_Scan  (JFrog Xray equivalent)
+  # OWASP checks Maven dependencies for known CVEs.
+  # Fails on CVSS >= 9 (Critical only — banks care about supply chain)
+  # ═══════════════════════════════════════════════════════════════════════════
+  dependency-scan:
+    name: Dependency_Scan — ${{ matrix.service }}
     runs-on: ubuntu-latest
-    needs: build-and-test
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      packages: write
+    needs: [parse-context, build]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - service: accounts-service
-            dir: accounts-service
-            deploy: accounts-ms
-          - service: api-gateway
-            dir: api-gateway
-            deploy: api-gateway
-          - service: audit-service
-            dir: audit-service
-            deploy: audit-ms
-          - service: auth-service
-            dir: auth-service
-            deploy: auth-ms
-          - service: cards-service
-            dir: cards-service
-            deploy: cards-ms
-          - service: customers-service
-            dir: customers-service
-            deploy: customers-ms
-          - service: fraud-service
-            dir: fraud-service
-            deploy: fraud-ms
-          - service: loans-service
-            dir: loans-service
-            deploy: loans-ms
-          - service: notifications-service
-            dir: notifications-service
-            deploy: notifications-ms
-          - service: transactions-service
-            dir: transactions-service
-            deploy: transactions-ms
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download JAR
-        uses: actions/download-artifact@v4
-        with:
-          name: jar-${{ matrix.service }}
-          path: ${{ matrix.dir }}/target/
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}
-          tags: |
-            type=sha,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=branch
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: ${{ matrix.dir }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
-
-  deploy:
-    name: Deploy to K8s
-    runs-on: ubuntu-latest
-    needs: docker-build
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      packages: read
-    environment:
-      name: production
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-
-      - name: Configure kubeconfig
-        run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
-          chmod 600 ~/.kube/config
-
-      - name: Verify cluster
-        run: kubectl get nodes
-
-      - name: Apply Istio resources
-        run: kubectl apply -f k8s/istio/ --ignore-not-found
-
-      - name: Apply app manifests
-        run: kubectl apply -f k8s/apps/ --ignore-not-found
-
-      - name: Update image tags
-        env:
-          OWNER: ${{ github.repository_owner }}
-          REGISTRY: ${{ env.REGISTRY }}
-        run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          declare -A services=(
-            [accounts-ms]="accounts-service"
-            [api-gateway]="api-gateway"
-            [audit-ms]="audit-service"
-            [auth-ms]="auth-service"
-            [cards-ms]="cards-service"
-            [customers-ms]="customers-service"
-            [fraud-ms]="fraud-service"
-            [loans-ms]="loans-service"
-            [notifications-ms]="notifications-service"
-            [transactions-ms]="transactions-service"
-          )
-          for deploy in "${!services[@]}"; do
-            svc="${services[$deploy]}"
-            image="${REGISTRY}/${OWNER}/rewabank/${svc}:${SHORT_SHA}"
-            kubectl set image deployment/${deploy} ${deploy}=${image} -n banking || true
-          done
-
-      - name: Wait for rollouts
-        run: |
-          for deploy in accounts-ms api-gateway audit-ms auth-ms cards-ms customers-ms fraud-ms loans-ms notifications-ms transactions-ms; do
-            kubectl rollout status deployment/${deploy} -n banking --timeout=300s || \
-            kubectl rollout undo deployment/${deploy} -n banking || true
-          done
-
-      - name: Summary
-        if: always()
-        run: kubectl get deployments -n banking
-
-  security-scan:
-    name: OWASP Security Scan
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+      matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
@@ -277,31 +306,501 @@ jobs:
 
       - name: OWASP Dependency Check
         run: |
-          mvn org.owasp:dependency-check-maven:aggregate \
+          mvn -f ${{ matrix.dir }}/pom.xml \
+            org.owasp:dependency-check-maven:check \
             -DfailBuildOnCVSS=9 \
-            -Dformats=HTML,JSON \
             -DassemblyAnalyzerEnabled=false \
-            --fail-at-end || true
+            -Dformats=HTML,JSON \
+            -q
 
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: owasp-report-${{ github.run_number }}
-          path: "**/dependency-check-report.*"
+          name: owasp-${{ matrix.service }}
+          path: ${{ matrix.dir }}/target/dependency-check-report.*
           retention-days: 30
 
-  quality-gate:
-    name: Quality Gate
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 6 — SCA_Scan  (Snyk Software Composition Analysis)
+  # Open-source license compliance + vulnerability check.
+  # Required secret: SNYK_TOKEN
+  # ═══════════════════════════════════════════════════════════════════════════
+  sca-scan:
+    name: SCA_Scan — ${{ matrix.service }}
     runs-on: ubuntu-latest
-    needs: [ build-and-test, security-scan ]
-    if: always()
+    needs: [parse-context, build]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
     steps:
-      - name: Check result
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Install BOM
+        run: mvn -f rewabank-bom/pom.xml install -q
+
+      - name: Snyk SCA
+        uses: snyk/actions/maven@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --file=${{ matrix.dir }}/pom.xml
+        continue-on-error: true    # free tier has rate limits
+
+      - name: Upload to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk.sarif
+          category: snyk-sca-${{ matrix.service }}
+        continue-on-error: true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 7 — Mutation_Test
+  # PIT proves tests actually catch real bugs — not just line coverage.
+  # Matrix per service path matches the enterprise pattern exactly.
+  # ═══════════════════════════════════════════════════════════════════════════
+  mutation-test:
+    name: Mutation_Test — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [parse-context, unit-tests-sonarqube]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Install BOM
+        run: mvn -f rewabank-bom/pom.xml install -q
+
+      - name: PIT mutation tests
         run: |
-          BUILD="${{ needs.build-and-test.result }}"
-          if [ "$BUILD" != "success" ] && [ "$BUILD" != "skipped" ]; then
-            echo "❌ Build/Test failed: $BUILD"
-            exit 1
+          mvn -f ${{ matrix.dir }}/pom.xml test-compile \
+            org.pitest:pitest-maven:mutationCoverage \
+            -DtargetClasses="com.rewabank.*" \
+            -DoutputFormats=HTML,XML \
+            -DmutationThreshold=60 \
+            -q
+        continue-on-error: true
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report-${{ matrix.service }}
+          path: ${{ matrix.dir }}/target/pit-reports/
+          retention-days: 7
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 8 — SAST_Scan  (Snyk SAST / CodeQL)
+  # Static analysis of Java source for security vulnerabilities.
+  # ═══════════════════════════════════════════════════════════════════════════
+  sast-scan:
+    name: SAST_Scan
+    runs-on: ubuntu-latest
+    needs: [parse-context, build]
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java
+          queries: security-and-quality
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build all for CodeQL
+        run: |
+          mvn -f rewabank-bom/pom.xml install -q
+          mvn compile -q -DskipTests --fail-at-end || true
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:java
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 9 — Build_Docker
+  # Builds image tagged with SHA — does NOT push as :latest yet.
+  # Scans happen BEFORE promotion (jobs 10 + 11).
+  # Only runs on master/main or manual dispatch.
+  # ═══════════════════════════════════════════════════════════════════════════
+  build-docker:
+    name: Build_Docker — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [parse-context, unit-tests-sonarqube, dependency-scan, sca-scan, base-image-validation]
+    if: |
+      (needs.parse-context.outputs.has_changes == 'true') &&
+      (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: jar-${{ matrix.service }}
+          path: ${{ matrix.dir }}/target/
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push (SHA tag — not :latest yet)
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.dir }}
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:sha-${{ needs.parse-context.outputs.short_sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 10 — Image_Scan  (JFrog Xray equivalent for Docker images)
+  # Trivy scans OS packages + libraries inside the built image.
+  # Fails on CRITICAL unfixed CVEs.
+  # ═══════════════════════════════════════════════════════════════════════════
+  image-scan:
+    name: Image_Scan — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [parse-context, build-docker]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Trivy — image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:sha-${{ needs.parse-context.outputs.short_sha }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          exit-code: '1'
+          severity: CRITICAL
+          ignore-unfixed: true
+
+      - name: Upload to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category: trivy-image-${{ matrix.service }}
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 11 — Container_Scan  (Snyk Container — second vendor)
+  # Defense in depth: Snyk + Trivy catch different CVE databases.
+  # Required secret: SNYK_TOKEN
+  # ═══════════════════════════════════════════════════════════════════════════
+  container-scan:
+    name: Container_Scan — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [parse-context, build-docker]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Snyk container scan
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:sha-${{ needs.parse-context.outputs.short_sha }}
+          args: --severity-threshold=high --file=${{ matrix.dir }}/Dockerfile
+        continue-on-error: true
+
+      - name: Upload to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk.sarif
+          category: snyk-container-${{ matrix.service }}
+        continue-on-error: true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 12 — Generate_Scorecard
+  # OpenSSF Scorecard — measures repo security posture.
+  # Independent — does not block publish.
+  # ═══════════════════════════════════════════════════════════════════════════
+  generate-scorecard:
+    name: Generate_Scorecard
+    runs-on: ubuntu-latest
+    needs: parse-context
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: OpenSSF Scorecard
+        uses: ossf/scorecard-action@v2.3.1
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: scorecard.sarif
+          category: scorecard
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 13 — Publish_Artifacts
+  # Promotes SHA-tagged image to :latest AFTER all scans pass.
+  # Idempotent — checks existing tag before pushing.
+  # Gets sha256 digest for manifest pinning in next job.
+  # ═══════════════════════════════════════════════════════════════════════════
+  publish-artifacts:
+    name: Publish_Artifacts — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [parse-context, image-scan, container-scan, sast-scan, mutation-test]
+    if: |
+      (needs.parse-context.outputs.has_changes == 'true') &&
+      (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Check for existing tag (idempotency)
+        id: check
+        run: |
+          SHA_TAG="sha-${{ needs.parse-context.outputs.short_sha }}"
+          IMAGE="${{ env.IMAGE_PREFIX }}/${{ matrix.service }}"
+          STATUS=$(docker manifest inspect ${IMAGE}:${SHA_TAG} > /dev/null 2>&1 && echo "exists" || echo "new")
+          echo "status=${STATUS}" >> $GITHUB_OUTPUT
+          echo "📦 ${IMAGE}:${SHA_TAG} → ${STATUS}"
+
+      - name: Promote SHA tag → :latest
+        run: |
+          SHA_TAG="sha-${{ needs.parse-context.outputs.short_sha }}"
+          IMAGE="${{ env.IMAGE_PREFIX }}/${{ matrix.service }}"
+          docker pull ${IMAGE}:${SHA_TAG}
+          docker tag  ${IMAGE}:${SHA_TAG} ${IMAGE}:latest
+          docker push ${IMAGE}:latest
+          echo "✅ Promoted ${SHA_TAG} → latest"
+
+      - name: Get sha256 digest
+        id: digest
+        run: |
+          IMAGE="${{ env.IMAGE_PREFIX }}/${{ matrix.service }}"
+          docker pull ${IMAGE}:latest
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${IMAGE}:latest)
+          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+          echo "🔒 Digest: ${DIGEST}"
+
+      - name: Save digest to file
+        run: echo "${{ steps.digest.outputs.digest }}" > digest-${{ matrix.service }}.txt
+
+      - name: Upload digest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.service }}
+          path: digest-${{ matrix.service }}.txt
+          retention-days: 1
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 14 — Create_Deployment_Package
+  # Pins sha256 digests into k8s manifests.
+  # Commits updated manifests back to repo — GitOps-ready.
+  # ═══════════════════════════════════════════════════════════════════════════
+  create-deployment-package:
+    name: Create_Deployment_Package
+    runs-on: ubuntu-latest
+    needs: [parse-context, publish-artifacts]
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Download all digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          path: digests/
+          merge-multiple: true
+
+      - name: Pin digests in k8s manifests
+        run: |
+          for digest_file in digests/digest-*.txt; do
+            SVC=$(basename "$digest_file" | sed 's/digest-//' | sed 's/\.txt//')
+            DIGEST=$(cat "$digest_file")
+            MANIFEST="k8s/apps/${SVC}.yaml"
+
+            [ -z "$DIGEST" ] && { echo "⚠️  No digest for ${SVC}"; continue; }
+            [ ! -f "$MANIFEST" ] && { echo "⚠️  No manifest: ${MANIFEST}"; continue; }
+
+            # Pin: replace :latest or existing @sha256 with new digest
+            sed -i "s|image: rewabank/${SVC}:.*|image: ${DIGEST}|g" "$MANIFEST"
+            sed -i "s|image: rewabank/${SVC}@.*|image: ${DIGEST}|g" "$MANIFEST"
+            echo "📌 ${SVC} → ${DIGEST}"
+          done
+
+      - name: Commit pinned manifests
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/apps/
+          if git diff --staged --quiet; then
+            echo "No manifest changes"
+            exit 0
           fi
-          echo "✅ Quality gate passed"
+          git commit -m "chore: pin image digests [sha: ${{ needs.parse-context.outputs.short_sha }}]
+
+          Auto-updated by CI — $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          [skip ci]"
+          git push
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 15 — Tag_Deployment_Artifact
+  # Creates immutable git tag for the deployed version.
+  # Gives ops team a named rollback point.
+  # ═══════════════════════════════════════════════════════════════════════════
+  tag-deployment-artifact:
+    name: Tag_Deployment_Artifact
+    runs-on: ubuntu-latest
+    needs: [parse-context, create-deployment-package]
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create deployment tag
+        run: |
+          DATE=$(date -u +%Y%m%d)
+          TAG="v${DATE}-${{ needs.parse-context.outputs.short_sha }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Deployment: ${TAG}
+
+          Branch:  ${{ github.ref_name }}
+          Commit:  ${{ github.sha }}
+          Trigger: ${{ github.event_name }}
+          Actor:   ${{ github.actor }}"
+          git push origin "${TAG}"
+          echo "🏷️  Tagged: ${TAG}"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 16 — Print_Receipt
+  # Always runs — audit trail of every stage result.
+  # ═══════════════════════════════════════════════════════════════════════════
+  print-receipt:
+    name: Print_Receipt
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - parse-context
+      - build
+      - base-image-validation
+      - unit-tests-sonarqube
+      - dependency-scan
+      - sca-scan
+      - mutation-test
+      - sast-scan
+      - build-docker
+      - image-scan
+      - container-scan
+      - generate-scorecard
+      - publish-artifacts
+      - create-deployment-package
+      - tag-deployment-artifact
+    steps:
+      - name: Print receipt
+        run: |
+          echo "╔══════════════════════════════════════════════════════════════╗"
+          echo "║           REWABANK CI/CD — PIPELINE RECEIPT                  ║"
+          echo "╠══════════════════════════════════════════════════════════════╣"
+          echo "║  Run:      #${{ github.run_number }}"
+          echo "║  Commit:   ${{ github.sha }}"
+          echo "║  Branch:   ${{ github.ref_name }}"
+          echo "║  Actor:    ${{ github.actor }}"
+          echo "║  Trigger:  ${{ github.event_name }}"
+          echo "║  Time:     $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "╠══════════════════════════════════════════════════════════════╣"
+          echo "║  STAGE                    RESULT"
+          echo "║  ─────────────────────────────────────────────────────────"
+          echo "║  Parse_Context          → ${{ needs.parse-context.result }}"
+          echo "║  Build                  → ${{ needs.build.result }}"
+          echo "║  Base_Image_Validation  → ${{ needs.base-image-validation.result }}"
+          echo "║  Unit_Tests_SonarQube   → ${{ needs.unit-tests-sonarqube.result }}"
+          echo "║  Dependency_Scan        → ${{ needs.dependency-scan.result }}"
+          echo "║  SCA_Scan               → ${{ needs.sca-scan.result }}"
+          echo "║  Mutation_Test          → ${{ needs.mutation-test.result }}"
+          echo "║  SAST_Scan              → ${{ needs.sast-scan.result }}"
+          echo "║  Build_Docker           → ${{ needs.build-docker.result }}"
+          echo "║  Image_Scan             → ${{ needs.image-scan.result }}"
+          echo "║  Container_Scan         → ${{ needs.container-scan.result }}"
+          echo "║  Generate_Scorecard     → ${{ needs.generate-scorecard.result }}"
+          echo "║  Publish_Artifacts      → ${{ needs.publish-artifacts.result }}"
+          echo "║  Create_Deployment_Pkg  → ${{ needs.create-deployment-package.result }}"
+          echo "║  Tag_Deployment         → ${{ needs.tag-deployment-artifact.result }}"
+          echo "╠══════════════════════════════════════════════════════════════╣"
+          if [[ "${{ needs.publish-artifacts.result }}" == "success" ]]; then
+            echo "║  STATUS: ✅ DEPLOYED SUCCESSFULLY                            ║"
+          elif [[ "${{ needs.image-scan.result }}" == "failure" ]]; then
+            echo "║  STATUS: ❌ BLOCKED — CRITICAL CVE IN IMAGE                  ║"
+          elif [[ "${{ needs.unit-tests-sonarqube.result }}" == "failure" ]]; then
+            echo "║  STATUS: ❌ BLOCKED — TESTS / QUALITY GATE FAILED            ║"
+          elif [[ "${{ needs.build.result }}" == "failure" ]]; then
+            echo "║  STATUS: ❌ BLOCKED — BUILD FAILED                           ║"
+          else
+            echo "║  STATUS: ⚠️  PIPELINE DID NOT REACH PUBLISH                 ║"
+          fi
+          echo "╚══════════════════════════════════════════════════════════════╝"

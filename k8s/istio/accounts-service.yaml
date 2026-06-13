@@ -75,7 +75,7 @@ spec:
       to:
         - operation:
             methods: ["GET","POST","PATCH"]
-            paths: ["/api/v1/accounts/*"]
+            paths: ["/api/v1/accounts", "/api/v1/accounts/*"]
     - from:
         - source:
             principals:
