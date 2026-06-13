@@ -2,7 +2,6 @@ package com.rewabank.accounts.services;
 
 import com.rewabank.accounts.entity.OutboxEvent;
 import com.rewabank.accounts.repository.OutboxEventRepository;
-import com.rewabank.accounts.services.OutboxPublisherService;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.BeforeEach;

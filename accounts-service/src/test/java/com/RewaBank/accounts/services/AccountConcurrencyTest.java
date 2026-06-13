@@ -5,7 +5,6 @@ import com.rewabank.accounts.client.CustomersFeignClient;
 import com.rewabank.accounts.entity.Account;
 import com.rewabank.accounts.exception.AccountException;
 import com.rewabank.accounts.repository.AccountsRepository;
-import com.rewabank.accounts.repository.OutboxEventRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,11 +15,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.RedisTemplate;
-
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -39,7 +36,7 @@ import static org.mockito.Mockito.when;
 class AccountConcurrencyTest {
 
     @Mock private AccountsRepository          accountsRepository;
-    @Mock private OutboxEventRepository       outboxEventRepository;
+    @Mock private OutboxEventSaver            outboxEventSaver;
     @Mock private CustomersFeignClient        customersFeignClient;
     @Mock private AccountReadService          accountReadService;
     @Mock private ObjectMapper                objectMapper;
@@ -68,8 +65,6 @@ class AccountConcurrencyTest {
                 .thenReturn(Optional.of(account));
         when(accountsRepository.save(any(Account.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
-        when(outboxEventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
     }
 
     // ── debit: balance floor enforcement ─────────────────────────────────────

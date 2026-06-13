@@ -1,22 +1,18 @@
 package com.rewabank.accounts.services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rewabank.accounts.client.CustomersFeignClient;
 import com.rewabank.accounts.dto.*;
 import com.rewabank.accounts.entity.Account;
 import com.rewabank.accounts.exception.AccountException;
 import com.rewabank.accounts.repository.AccountsRepository;
-import com.rewabank.accounts.repository.OutboxEventRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.RedisTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -35,19 +31,13 @@ class AccountServiceTest {
     private AccountsRepository accountsRepository;
 
     @Mock
-    private ObjectMapper objectMapper;
-
-    @Mock
     private CustomersFeignClient customersFeignClient;
 
     @Mock
-    private OutboxEventRepository outboxEventRepository;
+    private OutboxEventSaver outboxEventSaver;
 
     @Mock
     private AccountReadService accountReadService;
-
-    @Mock
-    private RedisTemplate<String, Object> redisTemplate;
 
     @Spy
     @InjectMocks
@@ -86,9 +76,6 @@ class AccountServiceTest {
         
         doReturn("123456789012").when(accountService).generateAccountNumber();
         
-        when(objectMapper.writeValueAsString(any()))
-                .thenReturn("{}");
-        
         Account savedAccount = Account.builder()
                 .id(UUID.randomUUID())
                 .accountNumber("123456789012")
@@ -113,7 +100,7 @@ class AccountServiceTest {
         assertEquals(Account.AccountType.SAVINGS, response.accountType());
         assertEquals("123456789012", response.accountNumber());
         verify(accountsRepository).save(any(Account.class));
-        verify(outboxEventRepository).save(any());
+        verify(outboxEventSaver).save(any(), any(), any(), any());
     }
 
     @Test
@@ -134,7 +121,6 @@ class AccountServiceTest {
         account.setStatus(Account.AccountStatus.PENDING);
         when(accountsRepository.findByIdAndDeletedAtIsNull(account.getId())).thenReturn(Optional.of(account));
         when(customersFeignClient.getKycStatus(account.getCustomerId())).thenReturn(new KycStatusResponse(account.getCustomerId().toString(), account.getKeycloakUserId(), "VERIFIED", true, "KYC verified successfully"));
-        doReturn("{}").when(objectMapper).writeValueAsString(any());
 
         // Act
         AccountResponse response = accountService.activateAccount(account.getId());
@@ -227,7 +213,6 @@ class AccountServiceTest {
         account.setStatus(Account.AccountStatus.ACTIVE);
         account.setBalance(new BigDecimal("1000.00"));
         when(accountsRepository.findByIdForUpdate(account.getId())).thenReturn(Optional.of(account));
-        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
 
         AccountResponse response = accountService.credit(account.getId(),
                 new BigDecimal("500.00"), "corr-001");
@@ -235,7 +220,7 @@ class AccountServiceTest {
         assertEquals(new BigDecimal("1500.00"), response.balance());
         verify(accountsRepository).save(account);
         verify(accountReadService).updateBalanceCache(account);
-        verify(outboxEventRepository).save(any());
+        verify(outboxEventSaver).save(any(), any(), any(), any());
     }
 
     @Test
@@ -276,7 +261,6 @@ class AccountServiceTest {
         account.setBalance(new BigDecimal("5000.00"));
         account.setMinimumBalance(new BigDecimal("1000.00"));
         when(accountsRepository.findByIdForUpdate(account.getId())).thenReturn(Optional.of(account));
-        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
 
         AccountResponse response = accountService.debit(account.getId(),
                 new BigDecimal("2000.00"), "corr-010");
@@ -284,7 +268,7 @@ class AccountServiceTest {
         assertEquals(new BigDecimal("3000.00"), response.balance());
         verify(accountsRepository).save(account);
         verify(accountReadService).updateBalanceCache(account);
-        verify(outboxEventRepository).save(any());
+        verify(outboxEventSaver).save(any(), any(), any(), any());
     }
 
     @Test
@@ -341,13 +325,12 @@ class AccountServiceTest {
         account.setStatus(Account.AccountStatus.ACTIVE);
         when(accountsRepository.findByIdAndDeletedAtIsNull(account.getId()))
                 .thenReturn(Optional.of(account));
-        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
 
         accountService.markDormant(account.getId());
 
         assertEquals(Account.AccountStatus.DORMANT, account.getStatus());
         verify(accountsRepository).save(account);
-        verify(outboxEventRepository).save(any());
+        verify(outboxEventSaver).save(any(), any(), any(), any());
     }
 
     @Test
@@ -380,7 +363,6 @@ class AccountServiceTest {
         when(accountsRepository.findByCustomerIdAndDeletedAtIsNull(customerId))
                 .thenReturn(List.of());
         doReturn("123456789013").when(accountService).generateAccountNumber();
-        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
 
         Account savedAccount = Account.builder()
                 .id(UUID.randomUUID())
