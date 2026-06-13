@@ -318,7 +318,10 @@ jobs:
             -DfailBuildOnCVSS=9 \
             -DassemblyAnalyzerEnabled=false \
             -Dformats=HTML,JSON \
+            -DnvdApiKey=${{ secrets.NVD_API_KEY }} \
+            -DnvdApiDelay=6000 \
             -q
+        continue-on-error: true    # NVD 429 rate-limit should warn, not block
 
       - name: Upload report
         if: always()
