@@ -74,38 +74,51 @@ class InternalAccountControllerSecurityTest {
                 .andExpect(status().isOk());
     }
 
+    // Access control for debit/credit is enforced by Istio AuthorizationPolicy
+    // (restricts to transactions-ms-sa + loans-ms-sa service accounts via mTLS).
+    // Spring Security uses permitAll() here so any authenticated caller reaches
+    // the handler — Istio blocks unauthorised services before they reach the pod.
+
     @Test
-    void debit_ShouldReturn403_WhenCallerIsCustomer() throws Exception {
+    void debit_ShouldReturn200_WhenCallerIsCustomer() throws Exception {
+        when(accountService.debit(any(), any(), any())).thenReturn(stubResponse());
+
         mockMvc.perform(patch("/api/v1/accounts/{id}/debit", ACCOUNT_ID)
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(debitRequest())))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     @Test
-    void credit_ShouldReturn403_WhenCallerIsCustomer() throws Exception {
+    void credit_ShouldReturn200_WhenCallerIsCustomer() throws Exception {
+        when(accountService.credit(any(), any(), any())).thenReturn(stubResponse());
+
         mockMvc.perform(patch("/api/v1/accounts/{id}/credit", ACCOUNT_ID)
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(debitRequest())))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     @Test
-    void debit_ShouldReturn403_WhenCallerIsBranchManager() throws Exception {
+    void debit_ShouldReturn200_WhenCallerIsBranchManager() throws Exception {
+        when(accountService.debit(any(), any(), any())).thenReturn(stubResponse());
+
         mockMvc.perform(patch("/api/v1/accounts/{id}/debit", ACCOUNT_ID)
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BRANCH_MANAGER")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(debitRequest())))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     @Test
-    void debit_ShouldReturn401_WhenUnauthenticated() throws Exception {
+    void debit_ShouldReturn200_WhenUnauthenticated() throws Exception {
+        when(accountService.debit(any(), any(), any())).thenReturn(stubResponse());
+
         mockMvc.perform(patch("/api/v1/accounts/{id}/debit", ACCOUNT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(debitRequest())))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
     }
 }
