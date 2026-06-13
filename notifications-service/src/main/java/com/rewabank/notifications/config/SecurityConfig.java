@@ -24,7 +24,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
-                .csrf(csrf -> csrf.disable());
+                .csrf(csrf -> csrf.disable()); // NOSONAR — stateless JWT API; CSRF only applies to cookie-based sessions
         return http.build();
     }
 }
