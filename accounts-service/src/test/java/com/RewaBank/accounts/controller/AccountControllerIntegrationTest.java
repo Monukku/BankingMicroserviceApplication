@@ -1,4 +1,4 @@
-package com.RewaBank.accounts.controller;
+package com.rewabank.accounts.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rewabank.accounts.client.CustomersFeignClient;
