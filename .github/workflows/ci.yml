@@ -122,34 +122,41 @@ jobs:
 
       - name: Build service matrix
         id: set-matrix
+        env:
+          DISPATCH:             ${{ github.event.inputs.service }}
+          CHANGED_ACCOUNTS:     ${{ steps.filter.outputs['accounts-service'] }}
+          CHANGED_GATEWAY:      ${{ steps.filter.outputs['api-gateway'] }}
+          CHANGED_AUTH:         ${{ steps.filter.outputs['auth-service'] }}
+          CHANGED_CARDS:        ${{ steps.filter.outputs['cards-service'] }}
+          CHANGED_CUSTOMERS:    ${{ steps.filter.outputs['customers-service'] }}
+          CHANGED_FRAUD:        ${{ steps.filter.outputs['fraud-service'] }}
+          CHANGED_LOANS:        ${{ steps.filter.outputs['loans-service'] }}
+          CHANGED_NOTIFICATIONS: ${{ steps.filter.outputs['notifications-service'] }}
+          CHANGED_TRANSACTIONS: ${{ steps.filter.outputs['transactions-service'] }}
         run: |
-          DISPATCH="${{ github.event.inputs.service }}"
-
-          # service → deploy-name:port
+          # Map service name → "deploy:port:changed_env_var"
           declare -A CATALOG=(
-            ["accounts-service"]="accounts-ms:8081"
-            ["api-gateway"]="api-gateway:8072"
-            ["auth-service"]="auth-ms:8073"
-            ["cards-service"]="cards-ms:8092"
-            ["customers-service"]="customers-ms:8080"
-            ["fraud-service"]="fraud-ms:8094"
-            ["loans-service"]="loans-ms:8090"
-            ["notifications-service"]="notifications-ms:9010"
-            ["transactions-service"]="transactions-ms:8082"
+            ["accounts-service"]="accounts-ms:8081:${CHANGED_ACCOUNTS}"
+            ["api-gateway"]="api-gateway:8072:${CHANGED_GATEWAY}"
+            ["auth-service"]="auth-ms:8073:${CHANGED_AUTH}"
+            ["cards-service"]="cards-ms:8092:${CHANGED_CARDS}"
+            ["customers-service"]="customers-ms:8080:${CHANGED_CUSTOMERS}"
+            ["fraud-service"]="fraud-ms:8094:${CHANGED_FRAUD}"
+            ["loans-service"]="loans-ms:8090:${CHANGED_LOANS}"
+            ["notifications-service"]="notifications-ms:9010:${CHANGED_NOTIFICATIONS}"
+            ["transactions-service"]="transactions-ms:8082:${CHANGED_TRANSACTIONS}"
           )
 
           MATRIX='{"include":['
           FIRST=true
 
           for svc in "${!CATALOG[@]}"; do
-            IFS=':' read -r deploy port <<< "${CATALOG[$svc]}"
+            IFS=':' read -r deploy port changed <<< "${CATALOG[$svc]}"
             INCLUDE=false
 
-            # Manual dispatch — use input
             if [ "$DISPATCH" = "all" ] || [ "$DISPATCH" = "$svc" ]; then
               INCLUDE=true
-            # Auto — use path filter result
-            elif [ "${{ steps.filter.outputs[svc] }}" = "true" ]; then
+            elif [ "$changed" = "true" ]; then
               INCLUDE=true
             fi
 
