@@ -1,7 +1,10 @@
 package com.rewabank.audit.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
 
 import java.time.LocalDateTime;
@@ -38,11 +41,11 @@ public class AuditLog {
     private String topic;
 
     // Who did it
-    @Column(name = "keycloak_user_id", length = 255)
+    @Column(name = "keycloak_user_id")
     private String keycloakUserId;
 
     // What it affected
-    @Column(name = "aggregate_id", length = 255)
+    @Column(name = "aggregate_id")
     private String aggregateId;
 
     @Column(name = "aggregate_type", length = 60)
