@@ -23,6 +23,13 @@ import java.util.stream.Collectors;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    private static final String ROLE_CUSTOMER             = "CUSTOMER";
+    private static final String ROLE_TELLER               = "TELLER";
+    private static final String ROLE_RELATIONSHIP_MANAGER = "RELATIONSHIP_MANAGER";
+    private static final String ROLE_BRANCH_MANAGER       = "BRANCH_MANAGER";
+    private static final String ROLE_AUDITOR              = "AUDITOR";
+    private static final String ROLE_SUPER_ADMIN          = "SUPER_ADMIN";
+
     @Value("${card.cvv.bcrypt-strength:5}")
     private int cvvBcryptStrength;
 
@@ -45,17 +52,17 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/cards",
                                 "/api/v1/cards/*")
-                        .hasAnyRole("CUSTOMER", "TELLER",
-                                "BRANCH_MANAGER", "SUPER_ADMIN")
+                        .hasAnyRole(ROLE_CUSTOMER, ROLE_TELLER,
+                                ROLE_BRANCH_MANAGER, ROLE_SUPER_ADMIN)
                         .requestMatchers(HttpMethod.PATCH,
                                 "/api/v1/cards/*/block",
                                 "/api/v1/cards/*/unblock")
-                        .hasAnyRole("CUSTOMER", "TELLER",
-                                "BRANCH_MANAGER", "SUPER_ADMIN")
+                        .hasAnyRole(ROLE_CUSTOMER, ROLE_TELLER,
+                                ROLE_BRANCH_MANAGER, ROLE_SUPER_ADMIN)
                         .requestMatchers(HttpMethod.GET, "/api/v1/cards/**")
-                        .hasAnyRole("CUSTOMER", "TELLER",
-                                "RELATIONSHIP_MANAGER",
-                                "BRANCH_MANAGER", "AUDITOR", "SUPER_ADMIN")
+                        .hasAnyRole(ROLE_CUSTOMER, ROLE_TELLER,
+                                ROLE_RELATIONSHIP_MANAGER,
+                                ROLE_BRANCH_MANAGER, ROLE_AUDITOR, ROLE_SUPER_ADMIN)
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
