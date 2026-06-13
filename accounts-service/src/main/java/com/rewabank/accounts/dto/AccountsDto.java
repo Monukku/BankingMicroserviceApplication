@@ -1,8 +1,8 @@
 package com.rewabank.accounts.dto;
 
-import com.rewabank.accounts.Utility.AccountCategory;
-import com.rewabank.accounts.Utility.AccountStatus;
-import com.rewabank.accounts.Utility.AccountType;
+import com.rewabank.accounts.utility.AccountCategory;
+import com.rewabank.accounts.utility.AccountStatus;
+import com.rewabank.accounts.utility.AccountType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;

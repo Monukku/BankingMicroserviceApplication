@@ -5,7 +5,6 @@ import com.rewabank.customers.dto.KycStatusResponse;
 import com.rewabank.customers.entity.Customer;
 import com.rewabank.customers.exception.CustomerException;
 import com.rewabank.customers.repository.CustomerRepository;
-import com.rewabank.customers.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -20,14 +19,15 @@ import java.util.UUID;
 @Slf4j
 public class CustomerService {
 
+    private static final String ERR_CODE_NOT_FOUND = "CUST_001";
+    private static final String ERR_CUSTOMER_NOT_FOUND = "Customer not found";
     private final CustomerRepository customerRepository;
-    private final EncryptionUtil     encryptionUtil;
 
     @Transactional(readOnly = true)
     public CustomerResponse getByKeycloakUserId(String keycloakUserId) {
         Customer customer = customerRepository
                 .findByKeycloakUserIdAndDeletedAtIsNull(keycloakUserId)
-                .orElseThrow(() -> new CustomerException("CUST_001", "Customer not found"));
+                .orElseThrow(() -> new CustomerException(ERR_CODE_NOT_FOUND, ERR_CUSTOMER_NOT_FOUND));
         return toResponse(customer);
     }
 
@@ -35,7 +35,7 @@ public class CustomerService {
     public CustomerResponse getById(UUID id) {
         Customer customer = customerRepository
                 .findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(() -> new CustomerException("CUST_001", "Customer not found"));
+                .orElseThrow(() -> new CustomerException(ERR_CODE_NOT_FOUND, ERR_CUSTOMER_NOT_FOUND));
         return toResponse(customer);
     }
 
@@ -45,7 +45,7 @@ public class CustomerService {
     public KycStatusResponse getKycStatus(UUID customerId) {
         Customer customer = customerRepository
                 .findByIdAndDeletedAtIsNull(customerId)
-                .orElseThrow(() -> new CustomerException("CUST_001", "Customer not found"));
+                .orElseThrow(() -> new CustomerException(ERR_CODE_NOT_FOUND, ERR_CUSTOMER_NOT_FOUND));
 
         return new KycStatusResponse(
                 customer.getId().toString(),

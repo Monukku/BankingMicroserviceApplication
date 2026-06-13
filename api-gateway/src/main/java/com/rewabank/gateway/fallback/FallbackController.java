@@ -20,6 +20,12 @@ public class FallbackController {
     }
 
     // ── Per-service fallbacks ─────────────────────────────────────────────────
+    @RequestMapping("/auth")
+    public Mono<ResponseEntity<Map<String, Object>>> authFallback() {
+        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(fallbackBody("AUTH_SERVICE_DOWN", "Auth service is temporarily unavailable.")));
+    }
+
     @RequestMapping("/accounts")
     public Mono<ResponseEntity<Map<String, Object>>> accountsFallback() {
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)

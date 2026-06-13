@@ -1,6 +1,5 @@
 package com.rewabank.transactions.service;
 
-import com.rewabank.transactions.dto.TransactionResponse;
 import com.rewabank.transactions.entity.Transaction;
 import com.rewabank.transactions.exception.TransactionException;
 import com.rewabank.transactions.repository.TransactionRepository;
@@ -34,6 +33,10 @@ public class IdempotencyService {
     private static final Duration TTL          = Duration.ofHours(24);
     private static final String IN_PROGRESS    = "IN_PROGRESS";
 
+    private static String sanitize(String v) {
+        return v == null ? "" : v.replaceAll("[\r\n]", "_");
+    }
+
     // Check if idempotency key already used
     public Optional<Transaction> checkExisting(String idempotencyKey) {
         // Check Redis first (fast path)
@@ -52,7 +55,7 @@ public class IdempotencyService {
     public void markInProgress(String idempotencyKey) {
         redisTemplate.opsForValue()
                 .set(PREFIX + idempotencyKey, IN_PROGRESS, TTL);
-        log.debug("Idempotency key marked IN_PROGRESS: {}", idempotencyKey);
+        log.debug("Idempotency key marked IN_PROGRESS: {}", sanitize(idempotencyKey));
     }
 
     // Mark key as completed with transaction ID
@@ -60,12 +63,12 @@ public class IdempotencyService {
         redisTemplate.opsForValue()
                 .set(PREFIX + idempotencyKey, transactionId, TTL);
         log.debug("Idempotency key completed: {} txnId: {}",
-                idempotencyKey, transactionId);
+                sanitize(idempotencyKey), transactionId);
     }
 
     // Release key on failure so client can retry with same key
     public void release(String idempotencyKey) {
         redisTemplate.delete(PREFIX + idempotencyKey);
-        log.debug("Idempotency key released: {}", idempotencyKey);
+        log.debug("Idempotency key released: {}", sanitize(idempotencyKey));
     }
 }

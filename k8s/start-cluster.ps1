@@ -4,7 +4,9 @@ Write-Host "Waiting for cluster..." -ForegroundColor Yellow
 Start-Sleep -Seconds 15
 
 # Fix nginx port routing
-docker exec k3d-rewabank-serverlb sh -c "sed -i 's/server k3d-rewabank-agent-0:80/server k3d-rewabank-agent-0:30759/g; s/server k3d-rewabank-server-0:80/server k3d-rewabank-server-0:30759/g' /etc/nginx/nginx.conf && nginx -s reload"
+docker exec k3d-rewabank-serverlb sh -c "sed -i 's/agent-0:80/agent-0:31947/g' /etc/nginx/nginx.conf"
+docker exec k3d-rewabank-serverlb sh -c "sed -i 's/server-0:80/server-0:31947/g' /etc/nginx/nginx.conf"
+docker exec k3d-rewabank-serverlb sh -c "nginx -s reload"
 
 Write-Host "Cluster ready!" -ForegroundColor Green
 Write-Host "API Gateway:    http://localhost/api/v1" -ForegroundColor Cyan

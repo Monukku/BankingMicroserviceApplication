@@ -31,7 +31,7 @@ public class EncryptionUtil {
             cipher.init(Cipher.ENCRYPT_MODE, aesSecretKey,
                     new GCMParameterSpec(TAG_LENGTH, iv));
             byte[] cipherText = cipher.doFinal(plainText.getBytes());
-            byte[] combined   = new byte[iv.length + cipherText.length];
+            byte[] combined   = new byte[Math.addExact(iv.length, cipherText.length)];
             System.arraycopy(iv, 0, combined, 0, iv.length);
             System.arraycopy(cipherText, 0, combined, iv.length,
                     cipherText.length);

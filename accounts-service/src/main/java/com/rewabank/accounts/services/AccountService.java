@@ -1,23 +1,17 @@
 package com.rewabank.accounts.services;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rewabank.accounts.client.CustomersFeignClient;
 import com.rewabank.accounts.dto.AccountCreateRequest;
 import com.rewabank.accounts.dto.AccountResponse;
 import com.rewabank.accounts.dto.KycStatusResponse;
 import com.rewabank.accounts.entity.Account;
-import com.rewabank.accounts.entity.OutboxEvent;
 import com.rewabank.accounts.exception.AccountException;
 import com.rewabank.accounts.repository.AccountsRepository;
-import com.rewabank.accounts.repository.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -31,14 +25,15 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AccountService {
 
-    private final AccountsRepository      accountRepository;
-    private final OutboxEventRepository  outboxEventRepository;
-    private final CustomersFeignClient   customersFeignClient;
-    private final AccountReadService     accountReadService;
-    private final ObjectMapper           objectMapper;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final AccountsRepository           accountRepository;
+    private final CustomersFeignClient         customersFeignClient;
+    private final AccountReadService           accountReadService;
+    private final OutboxEventSaver             outboxEventSaver;
 
     private final SecureRandom secureRandom = new SecureRandom();
+
+    private static final String ERR_ACCOUNT_NOT_FOUND   = "Account not found";
+    private static final String ERR_CODE_NOT_FOUND      = "ACCT_002";
 
     private static final String TOPIC_ACCOUNT_CREATED   = "bank.account.created";
     private static final String TOPIC_ACCOUNT_ACTIVATED = "bank.account.activated";
@@ -85,7 +80,7 @@ public class AccountService {
         Account savedAccount = accountRepository.save(account);
 
         // Save outbox event in SAME transaction — guaranteed delivery
-        saveOutboxEvent(savedAccount.getId().toString(),
+        outboxEventSaver.save(savedAccount.getId().toString(),
                 EVT_ACCOUNT_CREATED, TOPIC_ACCOUNT_CREATED,
                 buildAccountPayload(savedAccount, EVT_ACCOUNT_CREATED));
 
@@ -100,7 +95,7 @@ public class AccountService {
     public AccountResponse activateAccount(UUID accountId) {
         Account account = accountRepository
                 .findByIdAndDeletedAtIsNull(accountId)
-                .orElseThrow(() -> new AccountException("ACCT_002", "Account not found"));
+                .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
 
         if (!account.canActivate()) {
             throw new AccountException("ACCT_003",
@@ -132,7 +127,7 @@ public class AccountService {
         accountReadService.updateBalanceCache(account);
 
         // Outbox event
-        saveOutboxEvent(account.getId().toString(),
+        outboxEventSaver.save(account.getId().toString(),
                 EVT_ACCOUNT_ACTIVATED, TOPIC_ACCOUNT_ACTIVATED,
                 buildAccountPayload(account, EVT_ACCOUNT_ACTIVATED));
 
@@ -150,7 +145,7 @@ public class AccountService {
 
         // Pessimistic lock — prevents race conditions
         Account account = accountRepository.findByIdForUpdate(accountId)
-                .orElseThrow(() -> new AccountException("ACCT_002", "Account not found"));
+                .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
 
         if (!account.canTransact()) {
             throw new AccountException("ACCT_006",
@@ -166,7 +161,7 @@ public class AccountService {
         accountReadService.updateBalanceCache(account);
 
         // Outbox event
-        saveOutboxEvent(account.getId().toString(),
+        outboxEventSaver.save(account.getId().toString(),
                 EVT_BALANCE_UPDATED, TOPIC_BALANCE_UPDATED,
                 buildBalancePayload(account, amount, "CREDIT",
                         previousBalance, correlationId));
@@ -187,7 +182,7 @@ public class AccountService {
 
         // Pessimistic lock
         Account account = accountRepository.findByIdForUpdate(accountId)
-                .orElseThrow(() -> new AccountException("ACCT_002", "Account not found"));
+                .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
 
         if (!account.canTransact()) {
             throw new AccountException("ACCT_006",
@@ -211,7 +206,7 @@ public class AccountService {
         accountReadService.updateBalanceCache(account);
 
         // Outbox event
-        saveOutboxEvent(account.getId().toString(),
+        outboxEventSaver.save(account.getId().toString(),
                 EVT_BALANCE_UPDATED, TOPIC_BALANCE_UPDATED,
                 buildBalancePayload(account, amount, "DEBIT",
                         previousBalance, correlationId));
@@ -228,7 +223,7 @@ public class AccountService {
     public AccountResponse freezeAccount(UUID accountId, String reason) {
         Account account = accountRepository
                 .findByIdAndDeletedAtIsNull(accountId)
-                .orElseThrow(() -> new AccountException("ACCT_002", "Account not found"));
+                .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
 
         if (!account.canFreeze()) {
             throw new AccountException("ACCT_003",
@@ -243,12 +238,13 @@ public class AccountService {
         // Invalidate Redis read side
         accountReadService.evictBalanceCache(account.getAccountNumber());
 
-        saveOutboxEvent(account.getId().toString(),
+        outboxEventSaver.save(account.getId().toString(),
                 EVT_ACCOUNT_FROZEN, TOPIC_ACCOUNT_FROZEN,
                 buildAccountPayload(account, EVT_ACCOUNT_FROZEN));
 
         log.warn("Account frozen: {} reason: {}",
-                account.getAccountNumber(), reason);
+                account.getAccountNumber(),
+                reason == null ? "" : reason.replaceAll("[\r\n]", "_"));
         return toResponse(account);
     }
 
@@ -258,7 +254,7 @@ public class AccountService {
     public AccountResponse unfreezeAccount(UUID accountId) {
         Account account = accountRepository
                 .findByIdAndDeletedAtIsNull(accountId)
-                .orElseThrow(() -> new AccountException("ACCT_002", "Account not found"));
+                .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
 
         if (!account.canUnfreeze()) {
             throw new AccountException("ACCT_003",
@@ -272,7 +268,7 @@ public class AccountService {
 
         accountReadService.updateBalanceCache(account);
 
-        saveOutboxEvent(account.getId().toString(),
+        outboxEventSaver.save(account.getId().toString(),
                 "ACCOUNT_UNFROZEN", "bank.account.unfrozen",
                 buildAccountPayload(account, "ACCOUNT_UNFROZEN"));
 
@@ -286,7 +282,7 @@ public class AccountService {
     public AccountResponse closeAccount(UUID accountId) {
         Account account = accountRepository
                 .findByIdAndDeletedAtIsNull(accountId)
-                .orElseThrow(() -> new AccountException("ACCT_002", "Account not found"));
+                .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
 
         if (!account.canClose()) {
             throw new AccountException("ACCT_003",
@@ -305,7 +301,7 @@ public class AccountService {
 
         accountReadService.evictBalanceCache(account.getAccountNumber());
 
-        saveOutboxEvent(account.getId().toString(),
+        outboxEventSaver.save(account.getId().toString(),
                 EVT_ACCOUNT_CLOSED, TOPIC_ACCOUNT_CLOSED,
                 buildAccountPayload(account, EVT_ACCOUNT_CLOSED));
 
@@ -318,13 +314,13 @@ public class AccountService {
     public void markDormant(UUID accountId) {
         Account account = accountRepository
                 .findByIdAndDeletedAtIsNull(accountId)
-                .orElseThrow(() -> new AccountException("ACCT_002", "Account not found"));
+                .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
 
         if (account.getStatus() == Account.AccountStatus.ACTIVE) {
             account.setStatus(Account.AccountStatus.DORMANT);
             accountRepository.save(account);
 
-            saveOutboxEvent(account.getId().toString(),
+            outboxEventSaver.save(account.getId().toString(),
                     "ACCOUNT_DORMANT", "bank.account.dormant",
                     buildAccountPayload(account, "ACCOUNT_DORMANT"));
 
@@ -347,28 +343,10 @@ public class AccountService {
         return switch (type) {
             case SAVINGS          -> new BigDecimal("1000.00");
             case CURRENT          -> new BigDecimal("10000.00");
-            case SALARY           -> BigDecimal.ZERO;
-            case FIXED_DEPOSIT,
+            case SALARY,
+                 FIXED_DEPOSIT,
                  RECURRING_DEPOSIT -> BigDecimal.ZERO;
         };
-    }
-
-    @Transactional
-    public void saveOutboxEvent(String aggregateId, String eventType,
-                                String topic, Map<String, Object> payload) {
-        try {
-            OutboxEvent event = OutboxEvent.builder()
-                    .aggregateId(aggregateId)
-                    .eventType(eventType)
-                    .topic(topic)
-                    .payload(objectMapper.writeValueAsString(payload))
-                    .build();
-            outboxEventRepository.save(event);
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize outbox payload for {}: {}",
-                    eventType, e.getMessage());
-            throw new RuntimeException("Outbox serialization failed", e);
-        }
     }
 
     private Map<String, Object> buildAccountPayload(Account a, String eventType) {
@@ -423,6 +401,6 @@ public class AccountService {
     public AccountResponse getById(UUID id) {
         return accountRepository.findByIdAndDeletedAtIsNull(id)
                 .map(this::toResponse)
-                .orElseThrow(() -> new AccountException("ACCT_002", "Account not found"));
+                .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
     }
 }

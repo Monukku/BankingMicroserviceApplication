@@ -19,6 +19,10 @@ try {
 Invoke-RestMethod -Uri "$base/admin/realms/rewabank" -Method PUT -Headers @{Authorization="Bearer $TOKEN"} -ContentType "application/json" -Body '{"realm":"rewabank","enabled":true,"attributes":{"frontendUrl":"http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth"}}'
 Write-Host "Frontend URL set to internal DNS!" -ForegroundColor Green
 
+# Refresh token after frontendUrl change (frontendUrl change invalidates the current session)
+$TOKEN = (Invoke-RestMethod -Uri "$base/realms/master/protocol/openid-connect/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body "grant_type=password&client_id=admin-cli&username=admin&password=admin@2024").access_token
+Write-Host "Token refreshed after frontendUrl change" -ForegroundColor Green
+
 # Create rewabank-ms client (used by microservices)
 try {
     Invoke-RestMethod -Uri "$base/admin/realms/rewabank/clients" -Method POST -Headers @{Authorization="Bearer $TOKEN"} -ContentType "application/json" -Body '{"clientId":"rewabank-ms","secret":"rewabank-ms-secret-2024","redirectUris":["*"],"publicClient":false,"serviceAccountsEnabled":true,"directAccessGrantsEnabled":true,"enabled":true}'
@@ -49,11 +53,10 @@ $CLIENT  = (Invoke-RestMethod -Uri "$base/admin/realms/rewabank/clients?clientId
 $SA_USER = (Invoke-RestMethod -Uri "$base/admin/realms/rewabank/clients/$CLIENT/service-account-user" -Headers @{Authorization="Bearer $TOKEN"}).id
 $MGMT    = (Invoke-RestMethod -Uri "$base/admin/realms/rewabank/clients?clientId=realm-management" -Headers @{Authorization="Bearer $TOKEN"}).id
 
-$r1 = Invoke-RestMethod -Uri "$base/admin/realms/rewabank/clients/$MGMT/roles/manage-users" -Headers @{Authorization="Bearer $TOKEN"}
-$r2 = Invoke-RestMethod -Uri "$base/admin/realms/rewabank/clients/$MGMT/roles/view-users" -Headers @{Authorization="Bearer $TOKEN"}
-$r3 = Invoke-RestMethod -Uri "$base/admin/realms/rewabank/clients/$MGMT/roles/query-users" -Headers @{Authorization="Bearer $TOKEN"}
-
-Invoke-RestMethod -Uri "$base/admin/realms/rewabank/users/$SA_USER/role-mappings/clients/$MGMT" -Method POST -Headers @{Authorization="Bearer $TOKEN"} -ContentType "application/json" -Body "[$($r1 | ConvertTo-Json),$($r2 | ConvertTo-Json),$($r3 | ConvertTo-Json)]"
+$roleNames = @("manage-users","view-users","query-users","manage-realm","manage-clients")
+$roleObjs = $roleNames | ForEach-Object { Invoke-RestMethod -Uri "$base/admin/realms/rewabank/clients/$MGMT/roles/$_" -Headers @{Authorization="Bearer $TOKEN"} }
+$rolesJson = "[" + (($roleObjs | ForEach-Object { $_ | ConvertTo-Json }) -join ",") + "]"
+Invoke-RestMethod -Uri "$base/admin/realms/rewabank/users/$SA_USER/role-mappings/clients/$MGMT" -Method POST -Headers @{Authorization="Bearer $TOKEN"} -ContentType "application/json" -Body $rolesJson
 Write-Host "Permissions granted!" -ForegroundColor Green
 
 Write-Host "Keycloak fully configured!" -ForegroundColor Green

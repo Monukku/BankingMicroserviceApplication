@@ -31,7 +31,7 @@ public class AccountReadService {
     @Cacheable(value = "account-balance", key = "#accountNumber")
     @Transactional(readOnly = true)
     public BalanceResponse getBalance(String accountNumber) {
-        log.debug("Cache miss for account: {} — fetching from DB", accountNumber);
+        log.debug("Cache miss for account: {} — fetching from DB", accountNumber.replaceAll("[\r\n]", "_"));
         Account account = accountRepository
                 .findByAccountNumberAndDeletedAtIsNull(accountNumber)
                 .orElseThrow(() -> new AccountException("ACCT_002", "Account not found"));

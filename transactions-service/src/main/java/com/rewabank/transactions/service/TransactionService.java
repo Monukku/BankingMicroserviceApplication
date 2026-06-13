@@ -41,7 +41,7 @@ public class TransactionService {
         var existing = idempotencyService.checkExisting(idempotencyKey);
         if (existing.isPresent()) {
             log.info("Duplicate request — returning existing txn for key: {}",
-                    idempotencyKey);
+                    idempotencyKey.replaceAll("[\r\n]", "_"));
             return toResponse(existing.get());
         }
 

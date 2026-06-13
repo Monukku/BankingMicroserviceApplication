@@ -2,10 +2,8 @@ package com.rewabank.notifications.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -155,19 +153,22 @@ public class NotificationDispatcher {
 
     private boolean sendViaAwsSns(String to, String message) {
         // Wire: software.amazon.awssdk:sns + SnsClient.publish()
-        log.warn("AWS SNS not wired — add software.amazon.awssdk:sns to pom.xml");
+        log.warn("AWS SNS not wired (to={}, msgLen={}) — add software.amazon.awssdk:sns to pom.xml",
+                maskMobile(to), message == null ? 0 : message.length());
         return false;
     }
 
     private boolean sendViaSmtp(String to, String subject, String body) {
         // Wire: spring-boot-starter-mail + JavaMailSender
-        log.warn("SMTP not wired — add spring-boot-starter-mail to pom.xml and configure spring.mail.*");
+        log.warn("SMTP not wired (to={}, subject={}) — add spring-boot-starter-mail to pom.xml and configure spring.mail.*",
+                maskEmail(to), subject);
         return false;
     }
 
     private boolean sendViaAwsSes(String to, String subject, String body) {
         // Wire: software.amazon.awssdk:sesv2 + SesV2Client.sendEmail()
-        log.warn("AWS SES not wired — add software.amazon.awssdk:sesv2 to pom.xml");
+        log.warn("AWS SES not wired (to={}, subject={}) — add software.amazon.awssdk:sesv2 to pom.xml",
+                maskEmail(to), subject);
         return false;
     }
 

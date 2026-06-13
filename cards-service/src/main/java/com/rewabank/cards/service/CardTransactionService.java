@@ -2,7 +2,6 @@ package com.rewabank.cards.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rewabank.cards.client.FraudFeignClient;
-import com.rewabank.cards.client.NotificationFeignClient;
 import com.rewabank.cards.entity.Card;
 import com.rewabank.cards.entity.CardTransaction;
 import com.rewabank.cards.entity.OutboxEvent;
@@ -27,11 +26,13 @@ import java.util.*;
 @Transactional
 public class CardTransactionService {
 
+    private static final String ERR_CARD_NOT_FOUND = "CARD_NOT_FOUND";
+    private static final String ERR_TXN_NOT_FOUND  = "TXN_NOT_FOUND";
+    private static final String MSG_TXN_NOT_FOUND  = "Transaction not found: ";
     private final CardTransactionRepository transactionRepository;
     private final CardRepository cardRepository;
     private final OutboxEventRepository outboxEventRepository;
     private final FraudFeignClient fraudFeignClient;
-    private final NotificationFeignClient notificationFeignClient;
     private final ObjectMapper objectMapper;
 
     /**
@@ -56,7 +57,7 @@ public class CardTransactionService {
 
         // Verify card exists
         Card card = cardRepository.findById(cardId)
-                .orElseThrow(() -> new CardException("CARD_NOT_FOUND", "Card not found: " + cardId));
+                .orElseThrow(() -> new CardException(ERR_CARD_NOT_FOUND, "Card not found: " + cardId));
 
         if (!card.isActive()) {
             throw new CardException("CARD_INACTIVE", "Card is not active");
@@ -87,10 +88,10 @@ public class CardTransactionService {
         log.info("Authorizing transaction: {}", transactionId);
 
         CardTransaction transaction = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new CardException("TXN_NOT_FOUND", "Transaction not found: " + transactionId));
+                .orElseThrow(() -> new CardException(ERR_TXN_NOT_FOUND, MSG_TXN_NOT_FOUND + transactionId));
 
         Card card = cardRepository.findById(transaction.getCardId())
-                .orElseThrow(() -> new CardException("CARD_NOT_FOUND", "Card not found"));
+                .orElseThrow(() -> new CardException(ERR_CARD_NOT_FOUND, "Card not found"));
 
         // Validate transaction limits
         validateTransaction(card, transaction);
@@ -115,7 +116,7 @@ public class CardTransactionService {
         log.info("Settling transaction: {}", transactionId);
 
         CardTransaction transaction = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new CardException("TXN_NOT_FOUND", "Transaction not found: " + transactionId));
+                .orElseThrow(() -> new CardException(ERR_TXN_NOT_FOUND, MSG_TXN_NOT_FOUND + transactionId));
 
         if (transaction.getStatus() != CardTransaction.TransactionStatus.AUTHORIZED) {
             throw new CardException("TXN_INVALID_STATE", "Transaction is not authorized");
@@ -138,7 +139,7 @@ public class CardTransactionService {
         log.info("Declining transaction: {}, reason: {}", transactionId, reason);
 
         CardTransaction transaction = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new CardException("TXN_NOT_FOUND", "Transaction not found: " + transactionId));
+                .orElseThrow(() -> new CardException(ERR_TXN_NOT_FOUND, MSG_TXN_NOT_FOUND + transactionId));
 
         transaction.setStatus(CardTransaction.TransactionStatus.DECLINED);
         transaction.setDeclinedAt(LocalDateTime.now());
@@ -158,7 +159,7 @@ public class CardTransactionService {
         log.info("Reversing transaction: {}, reason: {}", transactionId, reason);
 
         CardTransaction transaction = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new CardException("TXN_NOT_FOUND", "Transaction not found: " + transactionId));
+                .orElseThrow(() -> new CardException(ERR_TXN_NOT_FOUND, MSG_TXN_NOT_FOUND + transactionId));
 
         transaction.setStatus(CardTransaction.TransactionStatus.REVERSED);
         transaction.setReversedAt(LocalDateTime.now());
@@ -179,7 +180,7 @@ public class CardTransactionService {
         
         // Verify card exists
         cardRepository.findById(cardId)
-                .orElseThrow(() -> new CardException("CARD_NOT_FOUND", "Card not found: " + cardId));
+                .orElseThrow(() -> new CardException(ERR_CARD_NOT_FOUND, "Card not found: " + cardId));
         
         return transactionRepository.findByCardId(cardId, pageable);
     }
@@ -215,12 +216,12 @@ public class CardTransactionService {
         }
 
         // International check
-        if (!card.getInternationalEnabled() && transaction.getIsInternational()) {
+        if (!Boolean.TRUE.equals(card.getInternationalEnabled()) && Boolean.TRUE.equals(transaction.getIsInternational())) {
             throw new CardException("TXN_NOT_ALLOWED", "International transactions not enabled");
         }
 
         // Online check
-        if (!card.getOnlineEnabled() && CardTransaction.TransactionType.ONLINE == transaction.getTransactionType()) {
+        if (!Boolean.TRUE.equals(card.getOnlineEnabled()) && CardTransaction.TransactionType.ONLINE == transaction.getTransactionType()) {
             throw new CardException("TXN_NOT_ALLOWED", "Online transactions not enabled");
         }
     }
@@ -253,7 +254,7 @@ public class CardTransactionService {
                 transaction.getTransactionType().name(),
                 transaction.getId().toString());
 
-        Integer score = ((Number) fraudResponse.getOrDefault("score", 0)).intValue();
+        int score = ((Number) fraudResponse.getOrDefault("score", 0)).intValue();
         transaction.setFraudScore(score);
 
         String action = (String) fraudResponse.getOrDefault("action", "ALLOW");

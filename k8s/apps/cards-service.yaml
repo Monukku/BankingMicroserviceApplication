@@ -49,7 +49,7 @@ spec:
       serviceAccountName: cards-ms-sa
       containers:
         - name: cards-ms
-          image: ghcr.io/rewabank/cards-service:latest
+          image: rewabank/cards-service:latest
           ports:
             - containerPort: 8092
           envFrom:

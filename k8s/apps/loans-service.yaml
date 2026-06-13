@@ -49,7 +49,7 @@ spec:
       serviceAccountName: loans-ms-sa
       containers:
         - name: loans-ms
-          image: ghcr.io/rewabank/loans-service:latest
+          image: rewabank/loans-service:latest
           ports:
             - containerPort: 8090
           envFrom:

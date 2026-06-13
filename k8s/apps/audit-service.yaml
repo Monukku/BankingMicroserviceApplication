@@ -41,7 +41,7 @@ spec:
       serviceAccountName: audit-ms-sa
       containers:
         - name: audit-ms
-          image: ghcr.io/rewabank/audit-service:latest
+          image: rewabank/audit-service:latest
           ports:
             - containerPort: 9011
           envFrom:

@@ -9,7 +9,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -82,7 +81,9 @@ public class FraudAlertService {
         );
 
         log.info("Fraud alert resolved: {} by: {} resolution: {}",
-                alertId, resolvedBy, resolution);
+                alertId,
+                resolvedBy == null ? "" : resolvedBy.replaceAll("[\r\n]", "_"),
+                resolution == null ? "" : resolution.replaceAll("[\r\n]", "_"));
         return alert;
     }
 

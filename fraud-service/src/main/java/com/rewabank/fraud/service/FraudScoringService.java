@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -146,12 +145,12 @@ public class FraudScoringService {
     }
 
     private void recordTransaction(UUID accountId, BigDecimal amount) {
-        // Increment velocity counter (10 min window)
+        // Increment velocity counter (10-min window)
         String velocityKey = VELOCITY_KEY + accountId + ":count";
         redisTemplate.opsForValue().increment(velocityKey);
         redisTemplate.expire(velocityKey, Duration.ofMinutes(10));
 
-        // Track amount repetition (1 hour window)
+        // Track amount repetition (1-hour window)
         String amountKey = AMOUNT_KEY + accountId + ":"
                 + amount.toPlainString();
         redisTemplate.opsForValue().increment(amountKey);

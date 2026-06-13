@@ -13,9 +13,9 @@ metadata:
   namespace: banking
 data:
   KAFKA_BOOTSTRAP:   "kafka-kafka-bootstrap.banking.svc.cluster.local:9092"
-  KEYCLOAK_JWKS_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs"
-  KEYCLOAK_ISSUER_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank"
-  MONGODB_URI:       "mongodb://$(DB_USERNAME):$(DB_PASSWORD)@mongodb-svc.banking.svc.cluster.local:27017/notifications_db?authSource=admin"
+  KEYCLOAK_JWKS_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs"
+  KEYCLOAK_ISSUER_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank"
+  MONGODB_URI:       "mongodb://root:mongodb%402024@mongodb-svc.banking.svc.cluster.local:27017/notifications_db?authSource=admin&authMechanism=SCRAM-SHA-256"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -42,7 +42,7 @@ spec:
       serviceAccountName: notifications-ms-sa
       containers:
         - name: notifications-ms
-          image: ghcr.io/rewabank/notifications-service:latest
+          image: rewabank/notifications-service:latest
           ports:
             - containerPort: 9010
           envFrom:

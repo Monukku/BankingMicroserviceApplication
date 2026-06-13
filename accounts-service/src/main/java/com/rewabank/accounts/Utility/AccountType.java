@@ -1,4 +1,4 @@
-package com.rewabank.accounts.Utility;
+package com.rewabank.accounts.utility;
 
 // AccountType.java
 public enum AccountType {

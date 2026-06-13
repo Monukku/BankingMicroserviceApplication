@@ -14,8 +14,8 @@ metadata:
 data:
   CORS_ORIGIN_MOBILE: "http://localhost:3000"
   CORS_ORIGIN_WEB: "http://localhost:4200"
-  KEYCLOAK_ISSUER_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank"
-  KEYCLOAK_JWKS_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs"
+  KEYCLOAK_ISSUER_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank"
+  KEYCLOAK_JWKS_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs"
   REDIS_HOST: "valkey.banking.svc.cluster.local"
   REDIS_PORT: "6379"
   SPRING_CLOUD_CONSUL_CONFIG_ENABLED: "false"
@@ -48,7 +48,7 @@ spec:
       serviceAccountName: api-gateway-sa
       containers:
         - name: api-gateway
-          image: ghcr.io/rewabank/api-gateway:latest
+          image: rewabank/api-gateway:latest
           ports:
             - containerPort: 8072
           envFrom:
@@ -61,7 +61,7 @@ spec:
                   name: redis-secret
                   key: password
             - name: KEYCLOAK_JWKS_URI
-              value: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs"
+              value: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces"
           volumeMounts:
