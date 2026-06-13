@@ -1,5 +1,6 @@
 package com.rewabank.cards.client;
 
+import com.rewabank.cards.config.FeignConfig;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -7,7 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import java.util.Map;
 import java.util.UUID;
 
-@FeignClient(name = "accounts-ms", url = "${feign.accounts-ms.url:http://localhost:8081}")
+@FeignClient(name = "accounts-ms", url = "${feign.accounts-ms.url:http://localhost:8081}", configuration = FeignConfig.class)
 public interface AccountsFeignClient {
 
     @GetMapping("/api/v1/accounts/{id}")

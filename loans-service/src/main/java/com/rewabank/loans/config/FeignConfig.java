@@ -18,4 +18,9 @@ public class FeignConfig {
     public Logger.Level feignLoggerLevel() {
         return Logger.Level.BASIC;
     }
+
+    @Bean
+    public FeignJwtInterceptor feignJwtInterceptor() {
+        return new FeignJwtInterceptor();
+    }
 }

@@ -28,8 +28,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
-                        // Internal KYC gate — called by Accounts MS (mTLS verified by Istio)
-                        .requestMatchers(HttpMethod.GET, "/api/v1/customers/*/kyc-status").authenticated()
+                        // Internal KYC gate — mTLS + AuthorizationPolicy enforced by Istio; JWT propagated by Feign interceptor for audit trail
+                        .requestMatchers(HttpMethod.GET, "/api/v1/customers/*/kyc-status").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

@@ -1,5 +1,6 @@
 package com.rewabank.cards.client;
 
+import com.rewabank.cards.config.FeignConfig;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -7,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import java.util.Map;
 import java.util.UUID;
 
-@FeignClient(name = "notification-ms", url = "${feign.notification-ms.url:http://localhost:9010}")
+@FeignClient(name = "notification-ms", url = "${feign.notification-ms.url:http://localhost:9010}", configuration = FeignConfig.class)
 public interface NotificationFeignClient {
 
     /**

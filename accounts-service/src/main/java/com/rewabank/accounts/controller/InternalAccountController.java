@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -26,7 +25,6 @@ public class InternalAccountController {
     private final AccountService accountService;
 
     @PatchMapping("/{accountId}/debit")
-    @PreAuthorize("hasRole('TRANSACTIONS_MS')")
     @Operation(summary = "Debit account — called by Transactions MS only")
     public ResponseEntity<AccountResponse> debit(
             @PathVariable UUID accountId,
@@ -36,7 +34,6 @@ public class InternalAccountController {
     }
 
     @PatchMapping("/{accountId}/credit")
-    @PreAuthorize("hasRole('TRANSACTIONS_MS')")
     @Operation(summary = "Credit account — called by Transactions MS only")
     public ResponseEntity<AccountResponse> credit(
             @PathVariable UUID accountId,
