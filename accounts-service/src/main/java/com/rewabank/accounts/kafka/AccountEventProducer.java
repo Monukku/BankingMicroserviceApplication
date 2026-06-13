@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
 
@@ -18,6 +19,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class AccountEventProducer {
+
+    private static final String FIELD_EVENT_ID   = "eventId";
+    private static final String FIELD_OCCURRED_AT = "occurredAt";
+    private static final String FIELD_ACCOUNT_ID  = "accountId";
+    private static final String FIELD_ACCOUNT_NUM = "accountNumber";
+    private static final String FIELD_CUSTOMER_ID = "customerId";
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
@@ -39,49 +46,49 @@ public class AccountEventProducer {
     public void publishAccountCreated(String accountId, String accountNumber,
                                       String customerId, String accountType) {
         publish(accountCreatedTopic, accountId, Map.of(
-                "eventId",       UUID.randomUUID().toString(),
+                FIELD_EVENT_ID,       UUID.randomUUID().toString(),
                 "eventType",     "ACCOUNT_CREATED",
-                "accountId",     accountId,
-                "accountNumber", accountNumber,
-                "customerId",    customerId,
+                FIELD_ACCOUNT_ID,     accountId,
+                FIELD_ACCOUNT_NUM, accountNumber,
+                FIELD_CUSTOMER_ID,    customerId,
                 "accountType",   accountType,
-                "occurredAt",    LocalDateTime.now().toString()
+                FIELD_OCCURRED_AT,    LocalDateTime.now(ZoneOffset.UTC).toString()
         ));
     }
 
     public void publishAccountActivated(String accountId, String accountNumber,
                                         String customerId) {
         publish(accountActivatedTopic, accountId, Map.of(
-                "eventId",       UUID.randomUUID().toString(),
+                FIELD_EVENT_ID,       UUID.randomUUID().toString(),
                 "eventType",     "ACCOUNT_ACTIVATED",
-                "accountId",     accountId,
-                "accountNumber", accountNumber,
-                "customerId",    customerId,
-                "occurredAt",    LocalDateTime.now().toString()
+                FIELD_ACCOUNT_ID,     accountId,
+                FIELD_ACCOUNT_NUM, accountNumber,
+                FIELD_CUSTOMER_ID,    customerId,
+                FIELD_OCCURRED_AT,    LocalDateTime.now(ZoneOffset.UTC).toString()
         ));
     }
 
     public void publishAccountFrozen(String accountId, String accountNumber,
                                      String reason) {
         publish(accountFrozenTopic, accountId, Map.of(
-                "eventId",       UUID.randomUUID().toString(),
+                FIELD_EVENT_ID,       UUID.randomUUID().toString(),
                 "eventType",     "ACCOUNT_FROZEN",
-                "accountId",     accountId,
-                "accountNumber", accountNumber,
+                FIELD_ACCOUNT_ID,     accountId,
+                FIELD_ACCOUNT_NUM, accountNumber,
                 "reason",        reason != null ? reason : "",
-                "occurredAt",    LocalDateTime.now().toString()
+                FIELD_OCCURRED_AT,    LocalDateTime.now(ZoneOffset.UTC).toString()
         ));
     }
 
     public void publishAccountClosed(String accountId, String accountNumber,
                                      String customerId) {
         publish(accountClosedTopic, accountId, Map.of(
-                "eventId",       UUID.randomUUID().toString(),
+                FIELD_EVENT_ID,       UUID.randomUUID().toString(),
                 "eventType",     "ACCOUNT_CLOSED",
-                "accountId",     accountId,
-                "accountNumber", accountNumber,
-                "customerId",    customerId,
-                "occurredAt",    LocalDateTime.now().toString()
+                FIELD_ACCOUNT_ID,     accountId,
+                FIELD_ACCOUNT_NUM, accountNumber,
+                FIELD_CUSTOMER_ID,    customerId,
+                FIELD_OCCURRED_AT,    LocalDateTime.now(ZoneOffset.UTC).toString()
         ));
     }
 
@@ -89,15 +96,15 @@ public class AccountEventProducer {
                                       String direction, String amount,
                                       String newBalance, String correlationId) {
         publish(balanceUpdatedTopic, accountId, Map.of(
-                "eventId",       UUID.randomUUID().toString(),
+                FIELD_EVENT_ID,       UUID.randomUUID().toString(),
                 "eventType",     "BALANCE_UPDATED",
-                "accountId",     accountId,
-                "accountNumber", accountNumber,
+                FIELD_ACCOUNT_ID,     accountId,
+                FIELD_ACCOUNT_NUM, accountNumber,
                 "direction",     direction,   // CREDIT or DEBIT
                 "amount",        amount,
                 "newBalance",    newBalance,
                 "correlationId", correlationId != null ? correlationId : "",
-                "occurredAt",    LocalDateTime.now().toString()
+                FIELD_OCCURRED_AT,    LocalDateTime.now(ZoneOffset.UTC).toString()
         ));
     }
 

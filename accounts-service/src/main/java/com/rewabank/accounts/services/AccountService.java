@@ -46,6 +46,12 @@ public class AccountService {
     private static final String TOPIC_ACCOUNT_CLOSED    = "bank.account.closed";
     private static final String TOPIC_BALANCE_UPDATED   = "bank.balance.updated";
 
+    private static final String EVT_BALANCE_UPDATED   = "BALANCE_UPDATED";
+    private static final String EVT_ACCOUNT_CREATED   = "ACCOUNT_CREATED";
+    private static final String EVT_ACCOUNT_ACTIVATED = "ACCOUNT_ACTIVATED";
+    private static final String EVT_ACCOUNT_FROZEN    = "ACCOUNT_FROZEN";
+    private static final String EVT_ACCOUNT_CLOSED    = "ACCOUNT_CLOSED";
+
     // ── Create account ────────────────────────────────────────────────────────
     @Transactional
     public AccountResponse createAccount(String keycloakUserId,
@@ -80,8 +86,8 @@ public class AccountService {
 
         // Save outbox event in SAME transaction — guaranteed delivery
         saveOutboxEvent(savedAccount.getId().toString(),
-                "ACCOUNT_CREATED", TOPIC_ACCOUNT_CREATED,
-                buildAccountPayload(savedAccount, "ACCOUNT_CREATED"));
+                EVT_ACCOUNT_CREATED, TOPIC_ACCOUNT_CREATED,
+                buildAccountPayload(savedAccount, EVT_ACCOUNT_CREATED));
 
         log.info("Account created: {} status: PENDING for customer: {}",
                 accountNumber, customerId);
@@ -127,8 +133,8 @@ public class AccountService {
 
         // Outbox event
         saveOutboxEvent(account.getId().toString(),
-                "ACCOUNT_ACTIVATED", TOPIC_ACCOUNT_ACTIVATED,
-                buildAccountPayload(account, "ACCOUNT_ACTIVATED"));
+                EVT_ACCOUNT_ACTIVATED, TOPIC_ACCOUNT_ACTIVATED,
+                buildAccountPayload(account, EVT_ACCOUNT_ACTIVATED));
 
         log.info("Account activated: {}", account.getAccountNumber());
         return toResponse(account);
@@ -161,7 +167,7 @@ public class AccountService {
 
         // Outbox event
         saveOutboxEvent(account.getId().toString(),
-                "BALANCE_UPDATED", TOPIC_BALANCE_UPDATED,
+                EVT_BALANCE_UPDATED, TOPIC_BALANCE_UPDATED,
                 buildBalancePayload(account, amount, "CREDIT",
                         previousBalance, correlationId));
 
@@ -206,7 +212,7 @@ public class AccountService {
 
         // Outbox event
         saveOutboxEvent(account.getId().toString(),
-                "BALANCE_UPDATED", TOPIC_BALANCE_UPDATED,
+                EVT_BALANCE_UPDATED, TOPIC_BALANCE_UPDATED,
                 buildBalancePayload(account, amount, "DEBIT",
                         previousBalance, correlationId));
 
@@ -238,8 +244,8 @@ public class AccountService {
         accountReadService.evictBalanceCache(account.getAccountNumber());
 
         saveOutboxEvent(account.getId().toString(),
-                "ACCOUNT_FROZEN", TOPIC_ACCOUNT_FROZEN,
-                buildAccountPayload(account, "ACCOUNT_FROZEN"));
+                EVT_ACCOUNT_FROZEN, TOPIC_ACCOUNT_FROZEN,
+                buildAccountPayload(account, EVT_ACCOUNT_FROZEN));
 
         log.warn("Account frozen: {} reason: {}",
                 account.getAccountNumber(), reason);
@@ -300,8 +306,8 @@ public class AccountService {
         accountReadService.evictBalanceCache(account.getAccountNumber());
 
         saveOutboxEvent(account.getId().toString(),
-                "ACCOUNT_CLOSED", TOPIC_ACCOUNT_CLOSED,
-                buildAccountPayload(account, "ACCOUNT_CLOSED"));
+                EVT_ACCOUNT_CLOSED, TOPIC_ACCOUNT_CLOSED,
+                buildAccountPayload(account, EVT_ACCOUNT_CLOSED));
 
         log.info("Account closed: {}", account.getAccountNumber());
         return toResponse(account);
@@ -384,7 +390,7 @@ public class AccountService {
                                                     BigDecimal previousBalance,
                                                     String correlationId) {
         return Map.of(
-                "eventType",       "BALANCE_UPDATED",
+                "eventType",       EVT_BALANCE_UPDATED,
                 "accountId",       a.getId().toString(),
                 "accountNumber",   a.getAccountNumber(),
                 "customerId",      a.getCustomerId().toString(),

@@ -11,12 +11,19 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    private static final String KEY_TIMESTAMP  = "timestamp";
+    private static final String KEY_STATUS     = "status";
+    private static final String KEY_ERROR_CODE = "errorCode";
+    private static final String KEY_MESSAGE    = "message";
+    private static final String KEY_PATH       = "path";
 
     @ExceptionHandler(AccountException.class)
     public ResponseEntity<Map<String, Object>> handleAccount(
@@ -38,11 +45,11 @@ public class GlobalExceptionHandler {
         log.warn("AccountException [{}]: {}", ex.getErrorCode(), ex.getMessage());
 
         return ResponseEntity.status(status).body(Map.of(
-                "timestamp", LocalDateTime.now().toString(),
-                "status",    status.value(),
-                "errorCode", ex.getErrorCode(),
-                "message",   ex.getMessage(),
-                "path",      request.getDescription(false).replace("uri=", "")
+                KEY_TIMESTAMP, LocalDateTime.now(ZoneOffset.UTC).toString(),
+                KEY_STATUS,    status.value(),
+                KEY_ERROR_CODE, ex.getErrorCode(),
+                KEY_MESSAGE,   ex.getMessage(),
+                KEY_PATH,      request.getDescription(false).replace("uri=", "")
         ));
     }
 
@@ -59,12 +66,12 @@ public class GlobalExceptionHandler {
                         (a, b) -> a));
 
         return ResponseEntity.badRequest().body(Map.of(
-                "timestamp",   LocalDateTime.now().toString(),
-                "status",      400,
-                "errorCode",   "ACCT_VALIDATION",
-                "message",     "Validation failed",
-                "fieldErrors", errors,
-                "path",        request.getDescription(false).replace("uri=", "")
+                KEY_TIMESTAMP,   LocalDateTime.now(ZoneOffset.UTC).toString(),
+                KEY_STATUS,      400,
+                KEY_ERROR_CODE,  "ACCT_VALIDATION",
+                KEY_MESSAGE,     "Validation failed",
+                "fieldErrors",   errors,
+                KEY_PATH,        request.getDescription(false).replace("uri=", "")
         ));
     }
 
@@ -73,11 +80,11 @@ public class GlobalExceptionHandler {
             DataIntegrityViolationException ex, WebRequest request) {
         log.warn("DataIntegrityViolation: {}", ex.getMostSpecificCause().getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                "timestamp", LocalDateTime.now().toString(),
-                "status",    409,
-                "errorCode", "ACCT_CONFLICT",
-                "message",   "Request conflicts with existing data",
-                "path",      request.getDescription(false).replace("uri=", "")
+                KEY_TIMESTAMP, LocalDateTime.now(ZoneOffset.UTC).toString(),
+                KEY_STATUS,    409,
+                KEY_ERROR_CODE, "ACCT_CONFLICT",
+                KEY_MESSAGE,   "Request conflicts with existing data",
+                KEY_PATH,      request.getDescription(false).replace("uri=", "")
         ));
     }
 
@@ -86,11 +93,11 @@ public class GlobalExceptionHandler {
             Exception ex, WebRequest request) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);
         return ResponseEntity.internalServerError().body(Map.of(
-                "timestamp", LocalDateTime.now().toString(),
-                "status",    500,
-                "errorCode", "ACCT_500",
-                "message",   "An unexpected error occurred",
-                "path",      request.getDescription(false).replace("uri=", "")
+                KEY_TIMESTAMP, LocalDateTime.now(ZoneOffset.UTC).toString(),
+                KEY_STATUS,    500,
+                KEY_ERROR_CODE, "ACCT_500",
+                KEY_MESSAGE,   "An unexpected error occurred",
+                KEY_PATH,      request.getDescription(false).replace("uri=", "")
         ));
     }
 }
