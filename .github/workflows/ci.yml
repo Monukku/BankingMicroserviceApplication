@@ -276,6 +276,7 @@ jobs:
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
             -Dsonar.qualitygate.wait=true \
+            -Dsonar.coverage.jacoco.xmlReportPaths=${{ matrix.dir }}/target/site/jacoco/jacoco.xml \
             -q
         continue-on-error: true    # don't block if SONAR_TOKEN not set yet
 
