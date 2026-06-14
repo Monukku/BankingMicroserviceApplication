@@ -54,8 +54,10 @@ class AuthControllerTest {
     @Test
     void getCurrentUser_tenDigitMobile_masksCorrectly() {
         // Kills MathMutator on: length - 3, NullReturn on method return
+        // stubUser() must be called BEFORE when() to avoid nested Mockito stubbing
+        BankingUser user = stubUser("9876543210");
         when(bankingUserRepository.findByKeycloakUserIdAndDeletedAtIsNull("kc-1"))
-                .thenReturn(Optional.of(stubUser("9876543210")));
+                .thenReturn(Optional.of(user));
 
         ResponseEntity<?> response = controller.getCurrentUser(mockJwt("kc-1"));
 
@@ -69,8 +71,9 @@ class AuthControllerTest {
     @Test
     void getCurrentUser_nullMobile_returnsPlaceholder() {
         // Kills NegateConditionals on: mobile == null || mobile.length() < 10
+        BankingUser user = stubUser(null);
         when(bankingUserRepository.findByKeycloakUserIdAndDeletedAtIsNull("kc-1"))
-                .thenReturn(Optional.of(stubUser(null)));
+                .thenReturn(Optional.of(user));
 
         ResponseEntity<?> response = controller.getCurrentUser(mockJwt("kc-1"));
 
@@ -82,9 +85,12 @@ class AuthControllerTest {
     @Test
     void getCurrentUser_shortMobile_returnsPlaceholder() {
         // Kills NegateConditionals on: length < 10
+        BankingUser user = stubUser("123456789"); // 9 chars
         when(bankingUserRepository.findByKeycloakUserIdAndDeletedAtIsNull("kc-1"))
-                .thenReturn(Optional.of(stubUser("123456789"))); // 9 chars
+                .thenReturn(Optional.of(user));
+
         ResponseEntity<?> response = controller.getCurrentUser(mockJwt("kc-1"));
+
         @SuppressWarnings("unchecked")
         Map<String, Object> body = (Map<String, Object>) response.getBody();
         assertThat(body.get("maskedMobile")).isEqualTo("XXXXXXXXXX");
@@ -93,9 +99,12 @@ class AuthControllerTest {
     @Test
     void getCurrentUser_exactlyTenDigits_masksInsteadOfPlaceholder() {
         // Kills ConditionalsBoundary: length < 10 vs length <= 10
+        BankingUser user = stubUser("9876543210"); // exactly 10
         when(bankingUserRepository.findByKeycloakUserIdAndDeletedAtIsNull("kc-1"))
-                .thenReturn(Optional.of(stubUser("9876543210"))); // exactly 10
+                .thenReturn(Optional.of(user));
+
         ResponseEntity<?> response = controller.getCurrentUser(mockJwt("kc-1"));
+
         @SuppressWarnings("unchecked")
         Map<String, Object> body = (Map<String, Object>) response.getBody();
         assertThat(body.get("maskedMobile").toString()).isNotEqualTo("XXXXXXXXXX");
