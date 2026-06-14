@@ -71,6 +71,31 @@ class FallbackControllerTest {
     }
 
     @Test
+    void authFallback_returns503WithCorrectErrorCode() {
+        assertFallback(controller.authFallback(), "AUTH_SERVICE_DOWN");
+    }
+
+    @Test
+    void notificationsFallback_returns503WithCorrectErrorCode() {
+        assertFallback(controller.notificationsFallback(), "NOTIF_SERVICE_DOWN");
+    }
+
+    @Test
+    void repaymentFallback_returns503WithCorrectErrorCode() {
+        assertFallback(controller.repaymentFallback(), "REPAY_SERVICE_DOWN");
+    }
+
+    @Test
+    void statementsFallback_returns503WithCorrectErrorCode() {
+        assertFallback(controller.statementsFallback(), "STMT_SERVICE_DOWN");
+    }
+
+    @Test
+    void reportsFallback_returns503WithCorrectErrorCode() {
+        assertFallback(controller.reportsFallback(), "RPT_SERVICE_DOWN");
+    }
+
+    @Test
     void allFallbacks_includeTimestampAndStatusFields() {
         StepVerifier.create(controller.accountsFallback())
                 .assertNext(resp -> {
