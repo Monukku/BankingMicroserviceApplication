@@ -9,7 +9,6 @@ import com.rewabank.customers.exception.CustomerException;
 import com.rewabank.customers.kafka.CustomerEventProducer;
 import com.rewabank.customers.repository.AddressRepository;
 import com.rewabank.customers.repository.CustomerRepository;
-import com.rewabank.customers.services.CustomerService;
 import com.rewabank.customers.util.EncryptionUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
