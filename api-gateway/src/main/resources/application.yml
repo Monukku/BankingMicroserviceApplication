@@ -34,8 +34,8 @@ spring:
       httpclient:
         connect-timeout: 1000
         # Global backstop — must be >= the largest per-route circuit-breaker time-limiter
-        # (payments = 15s) so the per-route time-limiter always fires first and returns the
-        # clean per-route fallback. See RESILIENCE-TIMEOUT-RETRY-AUDIT.md.
+        # (payments & transactions = 15s) so the per-route time-limiter always fires first
+        # and returns the clean per-route fallback. See RESILIENCE-TIMEOUT-RETRY-AUDIT.md.
         response-timeout: 16s
 
 # Rate limiting (bucket4j + Redis)
@@ -115,7 +115,7 @@ resilience4j:
       fraudCircuitBreaker:
         timeout-duration: 3s        # ← fraud must respond in 3s
       transactionsCircuitBreaker:
-        timeout-duration: 10s       # transactions can take longer
+        timeout-duration: 15s       # must cover the transfer saga (fraud 3s + debit 5s + credit 5s ~= 13s)
       paymentCircuitBreaker:
         timeout-duration: 15s       # payments (NEFT/RTGS) can be slower
       authCircuitBreaker:

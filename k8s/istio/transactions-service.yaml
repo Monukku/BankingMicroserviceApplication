@@ -11,7 +11,10 @@ spec:
     - match:
         - uri:
             prefix: /api/v1/transactions
-      timeout: 30s
+      # 14s sized to the transfer saga: fraud(3s)+debit(5s)+credit(5s) ~= 13s, +1s margin.
+      # Must NOT be smaller or a transfer gets cut mid-saga (debit without credit).
+      # retries 0 — idempotency by X-Idempotency-Key; a retried debit risks double-charge.
+      timeout: 14s
       retries:
         attempts: 0
       route:

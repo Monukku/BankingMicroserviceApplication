@@ -72,8 +72,10 @@ class CircuitBreakerConfigTest {
 
     @Test
     void financialInstances_haveTheirYamlTimeouts() {
+        // transactions time-limiter must cover the transfer saga (fraud 3s + debit 5s +
+        // credit 5s ~= 13s) so a transfer isn't cut mid-flight; payments = 15s.
         assertThat(timeLimiterRegistry.timeLimiter("transactionsCircuitBreaker")
-                .getTimeLimiterConfig().getTimeoutDuration()).isEqualTo(Duration.ofSeconds(10));
+                .getTimeLimiterConfig().getTimeoutDuration()).isEqualTo(Duration.ofSeconds(15));
         assertThat(timeLimiterRegistry.timeLimiter("paymentCircuitBreaker")
                 .getTimeLimiterConfig().getTimeoutDuration()).isEqualTo(Duration.ofSeconds(15));
     }
