@@ -13,9 +13,12 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
-      maximum-pool-size: 2
-      minimum-idle: 1
-      connection-timeout: 30000
+      # Pool raised from 2 → 10 (was starved under load — see load-test notes).
+      maximum-pool-size: 10
+      minimum-idle: 2
+      # 3s (was 30s): a DB-connection wait must finish well inside the service's Istio
+      # Backend VS (10s) so we fail internally before Istio cuts the request.
+      connection-timeout: 3000
       idle-timeout: 600000
 
   jpa:
