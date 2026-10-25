@@ -69,3 +69,12 @@ Columns ordered to match the ladder: **Ingress ≥ httpclient ≥ time-limiter �
 1. **Payments timeout ladder first** (riskiest — write path inversion).
 2. **Accounts + loans retry de-dup** (amplification).
 3. (Optional) tighten the loose ingress/kyc timeouts and reconsider `baseEjectionTime` for single-replica services.
+
+## APPLIED (2026-10-25)
+All of the above were applied as separate commits (not pushed). Final values:
+- **payments ladder**: ingress 18s > httpclient 16s > time-limiter 15s; retries 0.
+- **retry de-dup**: ingress catch-all retries 0; loans Spring `.retry` removed; `accounts-ms-vs` is the sole retry layer, connection-level only (`connect-failure,reset`) so writes are never replayed.
+- **ingress alignment**: catch-all 30s→18s, kyc 60s→18s.
+- **DB/Feign internal timeouts**: auth Hikari 30s→3s + pool 2→10; loans/cards Hikari 3s; audit Mongo 5s; accounts Hikari 5s→2s.
+- **Backend VS**: accounts 10s→8s (perTry 4s), customers 60s→8s, payments new VS 12s (retries 0).
+- **transactions — CORRECTION to this doc's earlier "8s" proposal**: 8s is UNSAFE. The transfer saga runs fraud(3s)+debit(5s)+credit(5s) ≈ 13s synchronously, so 8s (or the old 10s gateway TL) would cut a transfer mid-saga (debit without credit). Sized the chain to the saga instead: **ingress 17s > httpclient 16s > gateway time-limiter 15s > backend VS 14s > saga ~13s**, retries 0. (Alternative not taken: shrink the fraud/accounts Feign TLs, or make the saga async.)
