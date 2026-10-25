@@ -10,7 +10,7 @@ spec:
     - match:
         - uri:
             prefix: /api/v1/accounts
-      timeout: 10s
+      timeout: 8s
       # Sole retry layer for accounts (the ingress no longer retries). Connection-level
       # only — retryOn connect-failure,reset means we only retry when the request never
       # reached the app, so a PATCH balance debit/credit (a write) is never double-applied.
@@ -19,7 +19,7 @@ spec:
       retries:
         attempts: 2
         retryOn: connect-failure,reset
-        perTryTimeout: 5s
+        perTryTimeout: 4s
       route:
         - destination:
             host: accounts-service.banking.svc.cluster.local

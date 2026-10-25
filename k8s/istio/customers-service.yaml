@@ -10,7 +10,10 @@ spec:
     - match:
         - uri:
             prefix: /api/v1
-      timeout: 60s
+      # 8s (was 60s): aligned to the norm + the gateway customers time-limiter (10s).
+      # NOTE: KYC document uploads (MinIO/S3) are already capped by the gateway TL (10s);
+      # if large uploads need longer, give them a dedicated route with a higher timeout.
+      timeout: 8s
       route:
         - destination:
             host: customers-service.banking.svc.cluster.local

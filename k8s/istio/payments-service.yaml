@@ -1,0 +1,23 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: payments-ms-vs
+  namespace: banking
+spec:
+  hosts:
+    - payments-service.banking.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/payments
+      # 12s — under the gateway payment time-limiter (15s), above the internal budget
+      # (conn + Razorpay/accounts calls). retries 0: a payment is a write, never retry.
+      # See RESILIENCE-TIMEOUT-RETRY-AUDIT.md.
+      timeout: 12s
+      retries:
+        attempts: 0
+      route:
+        - destination:
+            host: payments-service.banking.svc.cluster.local
+            port:
+              number: 8083

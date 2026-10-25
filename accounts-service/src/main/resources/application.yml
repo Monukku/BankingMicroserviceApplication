@@ -18,7 +18,9 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
-      connection-timeout: 5000
+      # 2s so the sequential budget fits the 8s Backend VS: 2s conn + 5s customers-Feign
+      # (account create/KYC check) = 7s < 8s. Reads are far faster.
+      connection-timeout: 2000
       idle-timeout: 600000
       keepalive-time: 30000
   jpa:
