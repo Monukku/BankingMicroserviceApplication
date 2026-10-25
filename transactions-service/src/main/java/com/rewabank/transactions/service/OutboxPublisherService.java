@@ -7,9 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 @Service
 @RequiredArgsConstructor
@@ -19,22 +19,28 @@ public class OutboxPublisherService {
     private final OutboxEventRepository         outboxRepo;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
+    private static final int  MAX_RETRIES        = 5;
+    private static final long BASE_DELAY_SECONDS  = 5L;
+    private static final long MAX_DELAY_SECONDS   = 300L;
+
     @Transactional
-    public void publishPendingEvents() {
-        List<OutboxEvent> pending = outboxRepo.findPendingEvents();
+    public void publishPendingEvents(LocalDateTime now) {
+        List<OutboxEvent> pending = outboxRepo.findPendingEvents(now);
         for (OutboxEvent event : pending) {
             try {
-                kafkaTemplate.send(event.getTopic(),
+                var result = kafkaTemplate.send(event.getTopic(),
                                 event.getAggregateId(), event.getPayload())
-                        .whenComplete((result, ex) -> {
-                            if (ex != null) {
-                                handleFailure(event, ex.getMessage());
-                            } else {
-                                event.setStatus(OutboxEvent.OutboxStatus.PUBLISHED);
-                                event.setProcessedAt(LocalDateTime.now());
-                                outboxRepo.save(event);
-                            }
-                        });
+                        .get();
+                event.setStatus(OutboxEvent.OutboxStatus.PUBLISHED);
+                event.setProcessedAt(LocalDateTime.now());
+                outboxRepo.save(event);
+                log.debug("Outbox event published: {} offset: {}",
+                        event.getEventType(), result.getRecordMetadata().offset());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                handleFailure(event, "Interrupted: " + e.getMessage());
+            } catch (ExecutionException e) {
+                handleFailure(event, e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
             } catch (Exception e) {
                 handleFailure(event, e.getMessage());
             }
@@ -42,12 +48,21 @@ public class OutboxPublisherService {
     }
 
     private void handleFailure(OutboxEvent event, String error) {
-        event.setRetryCount(event.getRetryCount() + 1);
+        int retries = event.getRetryCount() + 1;
+        event.setRetryCount(retries);
         event.setLastError(error);
-        if (event.getRetryCount() >= 5) {
+
+        if (retries >= MAX_RETRIES) {
             event.setStatus(OutboxEvent.OutboxStatus.FAILED);
-            log.error("Outbox FAILED after 5 retries: {} error: {}",
-                    event.getEventType(), error);
+            log.error("Txn outbox event FAILED after {} retries: {} error: {}",
+                    MAX_RETRIES, event.getEventType(), error);
+        } else {
+            long delaySecs = Math.min(
+                    (long) Math.pow(2, retries) * BASE_DELAY_SECONDS,
+                    MAX_DELAY_SECONDS);
+            event.setNextRetryAt(LocalDateTime.now().plusSeconds(delaySecs));
+            log.warn("Txn outbox retry {}/{} in {}s: {} error: {}",
+                    retries, MAX_RETRIES - 1, delaySecs, event.getEventType(), error);
         }
         outboxRepo.save(event);
     }

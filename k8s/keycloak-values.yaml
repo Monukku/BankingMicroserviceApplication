@@ -1,15 +1,27 @@
-﻿command:
+﻿podAnnotations:
+  sidecar.istio.io/rewriteAppHTTPProbers: "false"
+
+command:
   - "/opt/keycloak/bin/kc.sh"
   - "start-dev"
   - "--db=postgres"
-  - "--db-url=jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/keycloak_db?sslmode=verify-ca&sslrootcert=/opt/keycloak/certs/ca.crt"
+  - "--db-url=$(KC_DB_URL)"
 extraEnv: |
+  - name: KC_DB_URL
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-db-secret
+        key: db-url
   - name: KEYCLOAK_ADMIN
-    value: admin
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-admin-secret
+        key: username
   - name: KEYCLOAK_ADMIN_PASSWORD
-    value: "admin@2024"
-  - name: KC_HTTP_RELATIVE_PATH
-    value: /auth
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-admin-secret
+        key: password
   - name: KC_DB_USERNAME
     valueFrom:
       secretKeyRef:
@@ -20,14 +32,33 @@ extraEnv: |
       secretKeyRef:
         name: keycloak-db-secret
         key: password
-extraVolumes: |
-  - name: postgresql-ca
-    secret:
-      secretName: postgresql-ca
-extraVolumeMounts: |
-  - name: postgresql-ca
-    mountPath: /opt/keycloak/certs
-    readOnly: true
+startupProbe: |
+  httpGet:
+    path: /auth/health/live
+    port: 9000
+    scheme: HTTP
+  initialDelaySeconds: 30
+  timeoutSeconds: 1
+  failureThreshold: 120
+  periodSeconds: 5
+readinessProbe: |
+  httpGet:
+    path: /auth/health/ready
+    port: 9000
+    scheme: HTTP
+  initialDelaySeconds: 60
+  timeoutSeconds: 1
+  failureThreshold: 3
+  periodSeconds: 10
+livenessProbe: |
+  httpGet:
+    path: /auth/health/live
+    port: 9000
+    scheme: HTTP
+  initialDelaySeconds: 120
+  timeoutSeconds: 1
+  failureThreshold: 3
+  periodSeconds: 10
 resources:
   requests:
     memory: 512Mi

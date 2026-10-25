@@ -1,12 +1,6 @@
-FROM eclipse-temurin:21-jdk-alpine AS builder
-WORKDIR /app
-COPY pom.xml .
-COPY src ./src
-RUN apk add --no-cache maven && mvn -q -DskipTests package
-
 FROM eclipse-temurin:21-jdk-alpine AS layers
 WORKDIR /app
-COPY --from=builder /app/target/*.jar app.jar
+COPY target/*.jar app.jar
 RUN java -Djarmode=layertools -jar app.jar extract
 
 FROM eclipse-temurin:21-jre-alpine

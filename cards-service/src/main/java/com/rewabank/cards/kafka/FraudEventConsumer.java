@@ -24,13 +24,13 @@ public class FraudEventConsumer {
 
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 500),
+            backoff = @Backoff(delay = 500, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
     @KafkaListener(
             topics = "bank.fraud.alert.raised",
-            groupId = "cards-ms-fraud"
+            groupId = "${kafka.consumer.groups.fraud:cards-ms-fraud}"
     )
     public void handleFraudAlert(Map<String, Object> event) {
         String accountId = (String) event.get("accountId");

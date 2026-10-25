@@ -6,6 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -76,6 +77,39 @@ public class Account {
     @Column(name = "last_transaction_at")
     private LocalDateTime lastTransactionAt;
 
+    // ── Fixed / Recurring Deposit fields ──────────────────────────────────────
+    @Column(name = "deposit_amount", precision = 19, scale = 4)
+    private BigDecimal depositAmount;
+
+    @Column(name = "tenure_months")
+    private Integer tenureMonths;
+
+    @Column(name = "maturity_date")
+    private LocalDate maturityDate;
+
+    // Savings/Current account that funded this FD/RD
+    @Column(name = "source_account_id")
+    private UUID sourceAccountId;
+
+    // RD: monthly installment amount
+    @Column(name = "installment_amount", precision = 19, scale = 4)
+    private BigDecimal installmentAmount;
+
+    // RD: next scheduled debit date
+    @Column(name = "next_installment_date")
+    private LocalDate nextInstallmentDate;
+
+    // Set when FD/RD matures and payout completes
+    @Column(name = "matured_at")
+    private LocalDateTime maturedAt;
+
+    // ── Salary account fields ──────────────────────────────────────────────────
+    @Column(name = "employer_name", length = 200)
+    private String employerName;
+
+    @Column(name = "employer_code", length = 50)
+    private String employerCode;
+
     // Soft delete
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -127,6 +161,7 @@ public class Account {
     public enum AccountType {
         SAVINGS,
         CURRENT,
+        BUSINESS,
         FIXED_DEPOSIT,
         RECURRING_DEPOSIT,
         SALARY

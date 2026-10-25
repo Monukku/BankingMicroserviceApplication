@@ -31,9 +31,9 @@ public class SecurityConfig {
                                 "/actuator/prometheus").permitAll()
                         .requestMatchers("/v3/api-docs/**",
                                 "/swagger-ui/**").permitAll()
-                        // Fraud score — internal only (Transactions MS via mTLS)
+                        // Fraud score — auth delegated to Istio mTLS (transactions-ms-sa only)
                         .requestMatchers(HttpMethod.GET, "/api/v1/fraud/score")
-                        .authenticated()
+                        .permitAll()
                         // Alert management — staff only
                         .requestMatchers("/api/v1/fraud/alerts/**")
                         .hasAnyRole("BRANCH_MANAGER", "SUPER_ADMIN")

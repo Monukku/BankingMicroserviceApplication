@@ -43,4 +43,8 @@ public interface CardRepository extends JpaRepository<Card, UUID> {
     List<Card> findActiveExpiredCards(LocalDate today);
 
     Optional<Card> findByIdempotencyKey(String idempotencyKey);
+
+    List<Card> findByCustomerId(UUID customerId);
+
+    List<Card> findByStatus(Card.CardStatus status);
 }

@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Outbox publisher — polls PENDING events and publishes to Kafka.
@@ -34,19 +35,22 @@ public class OutboxPublisherService {
 
         for (OutboxEvent event : pending) {
             try {
-                kafkaTemplate.send(event.getTopic(),
+                // Synchronous get() keeps the status update inside the same
+                // @Transactional boundary. Async whenComplete() fires after the
+                // transaction commits, leaving events permanently PENDING on failure.
+                var result = kafkaTemplate.send(event.getTopic(),
                                 event.getAggregateId(),
                                 event.getPayload())
-                        .whenComplete((result, ex) -> {
-                            if (ex != null) {
-                                handleFailure(event, ex.getMessage());
-                            } else {
-                                markPublished(event);
-                                log.debug("Outbox event published: {} offset: {}",
-                                        event.getEventType(),
-                                        result.getRecordMetadata().offset());
-                            }
-                        });
+                        .get();
+                markPublished(event);
+                log.debug("Outbox event published: {} offset: {}",
+                        event.getEventType(),
+                        result.getRecordMetadata().offset());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                handleFailure(event, "Interrupted: " + e.getMessage());
+            } catch (ExecutionException e) {
+                handleFailure(event, e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
             } catch (Exception e) {
                 handleFailure(event, e.getMessage());
             }

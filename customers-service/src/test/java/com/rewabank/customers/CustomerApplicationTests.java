@@ -10,7 +10,8 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.TestPropertySource;
-import io.minio.MinioClient;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @SpringBootTest
         @EnableAutoConfiguration(exclude = {
@@ -27,10 +28,11 @@ import io.minio.MinioClient;
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
         "spring.flyway.enabled=false",
         "build.version=1.0.0",
-        "minio.bucket-name=test-bucket",
-        "minio.url=http://localhost:9000",
-        "minio.access-key=test",
-        "minio.secret-key=test",
+        "s3.endpoint=https://s3.eu-central-003.backblazeb2.com",
+        "s3.access-key=test",
+        "s3.secret-key=test",
+        "s3.bucket-name=test-bucket",
+        "s3.region=eu-central-003",
         "encryption.aes-key=dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3Q=",
         "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost:8080/realms/test/protocol/openid-connect/certs"
 })
@@ -38,7 +40,8 @@ class CustomerApplicationTests {
 
     @MockBean RedisConnectionFactory redisConnectionFactory;
     @MockBean KafkaTemplate<?, ?> kafkaTemplate;
-    @MockBean MinioClient minioClient;
+    @MockBean S3Client s3Client;
+    @MockBean S3Presigner s3Presigner;
 
     @Test
     void contextLoads() {

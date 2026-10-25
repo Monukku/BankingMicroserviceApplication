@@ -46,6 +46,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health",
+                                "/actuator/health/**",
                                 "/actuator/prometheus").permitAll()
                         .requestMatchers("/v3/api-docs/**",
                                 "/swagger-ui/**").permitAll()
@@ -59,6 +60,11 @@ public class SecurityConfig {
                                 "/api/v1/cards/*/unblock")
                         .hasAnyRole(ROLE_CUSTOMER, ROLE_TELLER,
                                 ROLE_BRANCH_MANAGER, ROLE_SUPER_ADMIN)
+                        // activate: TELLER+ (enforced by @PreAuthorize)
+                        // cancel:   BRANCH_MANAGER+ (enforced by @PreAuthorize)
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/cards/*/activate",
+                                "/api/v1/cards/*/cancel")
+                        .hasAnyRole(ROLE_TELLER, ROLE_BRANCH_MANAGER, ROLE_SUPER_ADMIN)
                         .requestMatchers(HttpMethod.GET, "/api/v1/cards/**")
                         .hasAnyRole(ROLE_CUSTOMER, ROLE_TELLER,
                                 ROLE_RELATIONSHIP_MANAGER,

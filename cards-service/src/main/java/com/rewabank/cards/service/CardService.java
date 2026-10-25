@@ -51,13 +51,16 @@ public class CardService {
         // Verify the account belongs to this user
         try {
             Map<String, Object> account = accountsFeignClient.getAccount(request.accountId());
-            if (!keycloakUserId.equals(account.get("keycloakUserId"))) {
+            Object accountOwner = account.get("keycloakUserId");
+            log.info("Account ownership check — expected: {}, got: {}", keycloakUserId, accountOwner);
+            if (!keycloakUserId.equals(accountOwner)) {
                 throw new CardException("CARD_003",
                         "Account does not belong to the requesting user");
             }
         } catch (CardException e) {
             throw e;
         } catch (Exception e) {
+            log.error("Feign call to accounts failed: {} — {}", e.getClass().getSimpleName(), e.getMessage());
             throw new CardException("CARD_003",
                     "Could not verify account ownership: " + e.getMessage());
         }
@@ -102,43 +105,82 @@ public class CardService {
         return toResponse(card);
     }
 
-    // ── Block card (OTP required — RBI mandate) ───────────────────────────────
+    // ── Activate card (Teller physically hands card to customer) ─────────────
     @Transactional
-    public CardResponse blockCard(UUID cardId, String keycloakUserId,
-                                  CardBlockRequest request) {
-        Card card = findCardForUser(cardId, keycloakUserId);
+    public CardResponse activateCard(UUID cardId, String staffKeycloakUserId) {
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new CardException("CARD_001", "Card not found"));
+
+        if (!card.canActivate()) {
+            throw new CardException("CARD_002",
+                    "Card cannot be activated from status: " + card.getStatus());
+        }
+
+        card.setStatus(Card.CardStatus.ACTIVE);
+        card.setActivatedAt(LocalDateTime.now());
+        cardRepository.save(card);
+
+        eventProducer.publishCardActivated(
+                card.getId().toString(),
+                card.getKeycloakUserId(),
+                card.getAccountId().toString(),
+                card.getCardLastFour()
+        );
+
+        log.info("Card activated: **** **** **** {} by staff: {}",
+                card.getCardLastFour(), staffKeycloakUserId);
+
+        return toResponse(card);
+    }
+
+    // ── Block card ────────────────────────────────────────────────────────────
+    // Customer: OTP required (RBI mandate). Staff (TELLER+): reason only, no OTP.
+    @Transactional
+    public CardResponse blockCard(UUID cardId, String callerKeycloakUserId,
+                                  CardBlockRequest request, boolean isStaff) {
+        Card card = isStaff
+                ? cardRepository.findById(cardId)
+                        .orElseThrow(() -> new CardException("CARD_001", "Card not found"))
+                : findCardForUser(cardId, callerKeycloakUserId);
 
         if (!card.canBlock()) {
             throw new CardException("CARD_002",
                     "Card cannot be blocked from status: " + card.getStatus());
         }
 
-        // OTP verified by caller before reaching this method
-        // In production: Auth MS OTP verify called from controller
+        // Customer must supply OTP (RBI mandate); staff do not
+        if (!isStaff && (request.otp() == null || request.otp().isBlank())) {
+            throw new CardException("CARD_002", "OTP is required to block your card");
+        }
 
         card.setStatus(Card.CardStatus.BLOCKED);
-        card.setBlockReason(request.reason());
+        card.setBlockReason(request.reason() != null ? request.reason()
+                : (isStaff ? "Blocked by branch staff" : "Blocked by cardholder"));
         card.setBlockedAt(LocalDateTime.now());
-        card.setBlockedBy(keycloakUserId);
+        card.setBlockedBy(callerKeycloakUserId);
         cardRepository.save(card);
 
         eventProducer.publishCardBlocked(
                 card.getId().toString(),
-                keycloakUserId,
+                card.getKeycloakUserId(),
                 card.getAccountId().toString(),
-                request.reason()
+                card.getBlockReason()
         );
 
-        log.warn("Card blocked: **** **** **** {} by: {}",
-                card.getCardLastFour(), keycloakUserId);
+        log.warn("Card blocked: **** **** **** {} by: {} (staff={})",
+                card.getCardLastFour(), callerKeycloakUserId, isStaff);
 
         return toResponse(card);
     }
 
-    // ── Unblock card (OTP required — RBI mandate) ─────────────────────────────
+    // ── Unblock card ──────────────────────────────────────────────────────────
     @Transactional
-    public CardResponse unblockCard(UUID cardId, String keycloakUserId) {
-        Card card = findCardForUser(cardId, keycloakUserId);
+    public CardResponse unblockCard(UUID cardId, String callerKeycloakUserId,
+                                    boolean isStaff) {
+        Card card = isStaff
+                ? cardRepository.findById(cardId)
+                        .orElseThrow(() -> new CardException("CARD_001", "Card not found"))
+                : findCardForUser(cardId, callerKeycloakUserId);
 
         if (!card.canUnblock()) {
             throw new CardException("CARD_002",
@@ -151,10 +193,73 @@ public class CardService {
         card.setBlockedBy(null);
         cardRepository.save(card);
 
-        log.info("Card unblocked: **** **** **** {}",
-                card.getCardLastFour());
+        log.info("Card unblocked: **** **** **** {} by: {}",
+                card.getCardLastFour(), callerKeycloakUserId);
 
         return toResponse(card);
+    }
+
+    // ── Cancel card permanently (BranchManager+, compliance/fraud) ───────────
+    @Transactional
+    public CardResponse cancelCard(UUID cardId, String staffKeycloakUserId, String reason) {
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new CardException("CARD_001", "Card not found"));
+
+        if (card.getStatus() == Card.CardStatus.CANCELLED) {
+            throw new CardException("CARD_002", "Card is already cancelled");
+        }
+
+        card.setStatus(Card.CardStatus.CANCELLED);
+        card.setBlockReason(reason != null ? reason : "Cancelled by branch manager");
+        card.setBlockedAt(LocalDateTime.now());
+        card.setBlockedBy(staffKeycloakUserId);
+        card.setCancelledAt(LocalDateTime.now());
+        cardRepository.save(card);
+
+        eventProducer.publishCardCancelled(
+                card.getId().toString(),
+                card.getKeycloakUserId(),
+                card.getAccountId().toString(),
+                card.getBlockReason()
+        );
+
+        log.warn("Card cancelled: **** **** **** {} by staff: {}",
+                card.getCardLastFour(), staffKeycloakUserId);
+
+        return toResponse(card);
+    }
+
+    // ── Get cards for a customer (staff view) ─────────────────────────────────
+    @Transactional(readOnly = true)
+    public List<CardResponse> getCardsByCustomer(UUID customerId) {
+        return cardRepository.findByCustomerId(customerId)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CardResponse> getCardsByKeycloakUserId(String keycloakUserId) {
+        return cardRepository.findByKeycloakUserIdAndStatusNot(keycloakUserId, Card.CardStatus.CANCELLED)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    // ── Get all pending cards (Teller activation queue) ───────────────────────
+    @Transactional(readOnly = true)
+    public List<CardResponse> getAllCards() {
+        return cardRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<CardResponse> getPendingCards() {
+        return cardRepository.findByStatus(Card.CardStatus.PENDING)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
     // ── Auto-block from fraud alert ───────────────────────────────────────────
@@ -199,6 +304,13 @@ public class CardService {
         if (card.getStatus() == Card.CardStatus.CANCELLED) {
             throw new CardException("CARD_001", "Card not found or does not belong to you");
         }
+        return toResponse(card);
+    }
+
+    @Transactional(readOnly = true)
+    public CardResponse getByIdForStaff(UUID cardId) {
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new CardException("CARD_001", "Card not found"));
         return toResponse(card);
     }
 
@@ -247,12 +359,14 @@ public class CardService {
                 c.getId(),
                 c.getAccountId(),
                 encryptionUtil.maskCardNumber(c.getCardLastFour()),
+                c.getCardLastFour(),
                 c.getCardType(),
                 c.getCardNetwork(),
                 c.getStatus(),
                 c.getNameOnCard(),
                 c.getExpiryDate(),
                 c.getBlockReason(),
+                c.getBlockedBy(),
                 c.getActivatedAt(),
                 c.getCreatedAt()
         );

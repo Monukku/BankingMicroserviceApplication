@@ -30,4 +30,6 @@ public interface TransactionRepository
         AND t.keycloakUserId = :keycloakUserId
         """)
     Optional<Transaction> findByIdAndUser(UUID id, String keycloakUserId);
+
+    Page<Transaction> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

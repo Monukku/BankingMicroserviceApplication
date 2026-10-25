@@ -1,6 +1,6 @@
 package com.rewabank.loans.client;
 
-import com.rewabank.loans.config.FeignConfig;
+import com.rewabank.loans.config.FraudFeignConfig;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -12,7 +12,7 @@ import java.util.UUID;
 @FeignClient(
         name = "fraud-service",
         url = "${fraud.service.url:http://fraud-service.banking.svc.cluster.local:8094}",
-        configuration = FeignConfig.class,
+        configuration = FraudFeignConfig.class,
         fallback = FraudFeignClientFallback.class
 )
 public interface FraudFeignClient {

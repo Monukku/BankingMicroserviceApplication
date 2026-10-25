@@ -1,0 +1,28 @@
+# ── ServiceEntry — register Backblaze B2 and allow direct outbound ────────────
+# Direct egress (no gateway hop) — avoids AWS SDK v2 chunked-stream/TLS issues
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: backblaze-b2
+  namespace: banking
+spec:
+  hosts:
+    - s3.eu-central-003.backblazeb2.com
+  ports:
+    - number: 443
+      name: tls
+      protocol: TLS
+  location: MESH_EXTERNAL
+  resolution: DNS
+---
+# ── DestinationRule — disable Istio mTLS for external B2 traffic ─────────────
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: backblaze-b2-dr
+  namespace: banking
+spec:
+  host: s3.eu-central-003.backblazeb2.com
+  trafficPolicy:
+    tls:
+      mode: DISABLE

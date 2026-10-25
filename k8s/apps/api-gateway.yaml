@@ -12,9 +12,11 @@ metadata:
   name: api-gateway-config
   namespace: banking
 data:
-  CORS_ORIGIN_MOBILE: "http://localhost:3000"
-  CORS_ORIGIN_WEB: "http://localhost:4200"
-  KEYCLOAK_ISSUER_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank"
+  # Cloudflare Tunnel: HTTPS is terminated at Cloudflare edge, k3d receives plain HTTP.
+  # Replace api.rewarealm.com with your actual Cloudflare domain.
+  CORS_ORIGIN_WEB:    "https://www.rewarealm.com"
+  CORS_ORIGIN_MOBILE: "https://angular-banking-app.vercel.app"
+  KEYCLOAK_ISSUER_URI: "https://api.rewarealm.com/auth/realms/rewabank"
   KEYCLOAK_JWKS_URI: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs"
   REDIS_HOST: "valkey.banking.svc.cluster.local"
   REDIS_PORT: "6379"
@@ -60,8 +62,6 @@ spec:
                 secretKeyRef:
                   name: redis-secret
                   key: password
-            - name: KEYCLOAK_JWKS_URI
-              value: "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces"
           volumeMounts:
@@ -74,18 +74,24 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8072
+            failureThreshold: 30
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8072
-            initialDelaySeconds: 60
+            initialDelaySeconds: 5
             periodSeconds: 30
             failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8072
-            initialDelaySeconds: 30
+            initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 3
       volumes:

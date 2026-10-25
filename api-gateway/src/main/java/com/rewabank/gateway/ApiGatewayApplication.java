@@ -1,12 +1,7 @@
 package com.rewabank.gateway; // ← CHANGED from com.gateway.apigateway
 
-import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
-import io.github.resilience4j.timelimiter.TimeLimiterConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.circuitbreaker.resilience4j.ReactiveResilience4JCircuitBreakerFactory;
-import org.springframework.cloud.circuitbreaker.resilience4j.Resilience4JConfigBuilder;
-import org.springframework.cloud.client.circuitbreaker.Customizer;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.cloud.gateway.filter.ratelimit.RedisRateLimiter;
@@ -24,14 +19,14 @@ import java.time.LocalDateTime;
 public class ApiGatewayApplication {
 
 	// ── K8s DNS format: http://{service-name}.{namespace}.svc.cluster.local ──
-	private static final String ACCOUNTS_URI      = "http://accounts-service.banking.svc.cluster.local:8081";
+	private static final String ACCOUNTS_URI       = "http://accounts-service.banking.svc.cluster.local:8081";
 	private static final String AUTH_URI           = "http://auth-service.banking.svc.cluster.local:8073";
 	private static final String CUSTOMERS_URI      = "http://customers-service.banking.svc.cluster.local:8080";
 	private static final String TRANSACTIONS_URI   = "http://transactions-service.banking.svc.cluster.local:8082";
 	private static final String LOANS_URI          = "http://loans-service.banking.svc.cluster.local:8090";
 	private static final String REPAYMENT_URI      = "http://repayment-service.banking.svc.cluster.local:8091";
 	private static final String CARDS_URI          = "http://cards-service.banking.svc.cluster.local:8092";
-	private static final String PAYMENT_URI        = "http://payment-service.banking.svc.cluster.local:8093";
+	private static final String PAYMENT_URI        = "http://payments-service.banking.svc.cluster.local:8083";
 	private static final String FRAUD_URI          = "http://fraud-service.banking.svc.cluster.local:8094";
 	private static final String NOTIFICATIONS_URI  = "http://notifications-service.banking.svc.cluster.local:9010";
 	private static final String AUDIT_URI          = "http://audit-service.banking.svc.cluster.local:9011";
@@ -75,7 +70,7 @@ public class ApiGatewayApplication {
                                                                 .addResponseHeader(HEADER_RESPONSE_TIME, LocalDateTime.now().toString()))
                                                 .uri(CUSTOMERS_URI))
 
-				// ── Accounts MS ───────────────────────────────────────────────
+				// ── Accounts MS ───────────────────────────────────────────
 				.route("accounts-service", p -> p
 						.path("/api/v1/accounts/**")
 						.filters(f -> f
@@ -189,37 +184,10 @@ public class ApiGatewayApplication {
 				.build();
 	}
 
-	// ── Circuit breaker: default (4s timeout) ─────────────────────────────────
-	@Bean
-	public Customizer<ReactiveResilience4JCircuitBreakerFactory> defaultCustomizer() {
-		return factory -> factory.configureDefault(id ->
-				new Resilience4JConfigBuilder(id)
-						.circuitBreakerConfig(CircuitBreakerConfig.custom()
-								.slidingWindowSize(10)
-								.failureRateThreshold(50)
-								.waitDurationInOpenState(Duration.ofSeconds(10))
-								.permittedNumberOfCallsInHalfOpenState(2)
-								.build())
-						.timeLimiterConfig(TimeLimiterConfig.custom()
-								.timeoutDuration(Duration.ofSeconds(4))
-								.build())
-						.build());
-	}
-
-	// ── Circuit breaker: fraud — 3s timeout, fail fast ── ← NEW
-	@Bean
-	public Customizer<ReactiveResilience4JCircuitBreakerFactory> fraudCustomizer() {
-		return factory -> factory.configure(builder ->
-						builder.circuitBreakerConfig(CircuitBreakerConfig.custom()
-										.slidingWindowSize(5)
-										.failureRateThreshold(30)   // open faster for fraud
-										.waitDurationInOpenState(Duration.ofSeconds(5))
-										.build())
-								.timeLimiterConfig(TimeLimiterConfig.custom()
-										.timeoutDuration(Duration.ofSeconds(3)) // ← 3s max for fraud
-										.build()),
-				"fraudCircuitBreaker");
-	}
+	// Circuit-breaker & time-limiter configuration is YAML-driven (resilience4j.* in
+	// application.yml, consumed via resilience4j-spring-boot3). Intentionally no Java
+	// Customizer beans, so the config is tunable per-environment / live (ConfigMap) without
+	// a rebuild. The old recordException predicate is now `record-exceptions` in YAML.
 
 	// ── Rate limiter: general (20 req/s) ──────────────────────────────────────
 	@Bean

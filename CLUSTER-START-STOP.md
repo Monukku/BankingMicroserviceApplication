@@ -25,12 +25,9 @@ Wait for Docker Desktop to fully start before proceeding.
 ```
 
 ### Step 3 — Fix kubeconfig
-The API server port changes after every restart. Find it and update kubeconfig:
+The cluster uses fixed port 6443. Just run:
 ```powershell
-docker ps --filter name=k3d-rewabank-serverlb --format "{{.Ports}}"
-# Find the port mapped to 6443 — e.g. 0.0.0.0:59408->6443/tcp  ← use 59408
-
-kubectl config set-cluster k3d-rewabank --server=https://127.0.0.1:<PORT>
+kubectl config set-cluster k3d-rewabank --server=https://127.0.0.1:6443
 kubectl get nodes
 # Expected: both nodes Ready
 ```

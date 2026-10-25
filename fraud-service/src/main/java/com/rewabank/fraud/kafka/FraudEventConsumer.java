@@ -33,13 +33,13 @@ public class FraudEventConsumer {
     // Consume completed transactions for pattern analysis
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 1000, multiplier = 2),
+            backoff = @Backoff(delay = 1000, multiplier = 2, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
     @KafkaListener(
             topics = "bank.transaction.completed",
-            groupId = "fraud-ms-transactions"
+            groupId = "${kafka.consumer.groups.transactions:fraud-ms-transactions}"
     )
     public void handleTransactionCompleted(Map<String, Object> event) {
         String accountId     = (String) event.get("sourceAccountId");
@@ -75,13 +75,13 @@ public class FraudEventConsumer {
     // Consume balance updates — detect large sudden drops
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 1000, multiplier = 2),
+            backoff = @Backoff(delay = 1000, multiplier = 2, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
     @KafkaListener(
             topics = "bank.balance.updated",
-            groupId = "fraud-ms-balance"
+            groupId = "${kafka.consumer.groups.balance:fraud-ms-balance}"
     )
     public void handleBalanceUpdated(Map<String, Object> event) {
         String direction      = (String) event.getOrDefault("direction", "");
@@ -121,9 +121,15 @@ public class FraudEventConsumer {
     }
 
     // Mark new accounts in fraud engine when created
+    @RetryableTopic(
+            attempts = "3",
+            backoff = @Backoff(delay = 1000, multiplier = 2, random = true),
+            dltTopicSuffix = ".dlq",
+            retryTopicSuffix = ".retry"
+    )
     @KafkaListener(
             topics = "bank.account.created",
-            groupId = "fraud-ms-accounts"
+            groupId = "${kafka.consumer.groups.accounts:fraud-ms-accounts}"
     )
     public void handleAccountCreated(Map<String, Object> event) {
         String accountId = (String) event.get("accountId");

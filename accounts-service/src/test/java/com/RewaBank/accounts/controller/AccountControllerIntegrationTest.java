@@ -100,7 +100,10 @@ class AccountControllerIntegrationTest {
                         keycloakUserId,
                         "VERIFIED",
                         true,
-                        "KYC verified"
+                        "KYC verified",
+                        "Test User",
+                        "test@rewabank.com",
+                        "9999999999"
                 ));
     }
 

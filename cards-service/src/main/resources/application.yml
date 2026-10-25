@@ -7,6 +7,12 @@ server:
 spring:
   application:
     name: cards-ms
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+        group:
+          enabled: true   # CB instance name = @FeignClient name (e.g. fraud-ms), not full method signature
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/cards_db}
@@ -36,12 +42,15 @@ spring:
       acks: all
       retries: 3
     consumer:
-      group-id: cards-ms
+      group-id: ${KAFKA_CONSUMER_GROUP:cards-ms}
       auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: ${KAFKA_MAX_POLL_RECORDS:50}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
 
   security:
     oauth2:
@@ -67,6 +76,9 @@ kafka:
   topics:
     card-issued:  bank.card.issued
     card-blocked: bank.card.blocked
+  consumer:
+    groups:
+      fraud: ${KAFKA_CARDS_FRAUD_GROUP:cards-ms-fraud}
 
 management:
   endpoints:
@@ -87,10 +99,23 @@ management:
 
   tracing:
     sampling:
-      probability: 1.0
+      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
   otlp:
     tracing:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      fraud-ms:
+        sliding-window-size: ${CB_FRAUD_WINDOW:5}
+        failure-rate-threshold: ${CB_FRAUD_FAILURE_RATE:30}
+        wait-duration-in-open-state: ${CB_FRAUD_WAIT:5s}
+        permitted-number-of-calls-in-half-open-state: 2
+  timelimiter:
+    instances:
+      fraud-ms:
+        timeout-duration: ${CB_FRAUD_TIMEOUT:1s}
 
 card:
   cvv:
@@ -102,3 +127,8 @@ logging:
   pattern:
     level: "%5p[${spring.application.name},%X{traceId},%X{spanId}]"
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}

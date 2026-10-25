@@ -1,0 +1,98 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: payments-service
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri:  ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs}
+          issuer-uri:   ${KEYCLOAK_ISSUER_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank}
+
+  datasource:
+    url:      ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 5000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: public
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+  data:
+    redis:
+      host:             ${REDIS_HOST:valkey.banking.svc.cluster.local}
+      port:             ${REDIS_PORT:6379}
+      password:         ${REDIS_PASSWORD}
+      connect-timeout:  5s
+      timeout:          5s
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka-kafka-bootstrap.banking.svc.cluster.local:9092}
+
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+
+accounts:
+  service:
+    url: ${ACCOUNTS_SERVICE_URL:http://accounts-service.banking.svc.cluster.local:8081}
+
+razorpay:
+  key-id:         ${RAZORPAY_KEY_ID}
+  key-secret:     ${RAZORPAY_KEY_SECRET}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
+
+management:
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
+
+logging:
+  level:
+    com.rewabank: INFO
+    org.springframework.security: INFO
+  pattern:
+    level: "%5p[${spring.application.name},%X{traceId},%X{spanId}]"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"

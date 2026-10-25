@@ -202,7 +202,7 @@ class CardServiceTest {
         when(cardRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         CardResponse response = cardService.blockCard(cardId, "kc-user-1",
-                new CardBlockRequest("123456", "Lost card"));
+                new CardBlockRequest("123456", "Lost card"), false);
 
         assertThat(response.status()).isEqualTo(Card.CardStatus.BLOCKED);
         assertThat(activeCard.getBlockReason()).isEqualTo("Lost card");
@@ -219,7 +219,7 @@ class CardServiceTest {
                 .thenReturn(Optional.of(pendingCard));
 
         assertThatThrownBy(() -> cardService.blockCard(cardId, "kc-user-1",
-                new CardBlockRequest("123456", "reason")))
+                new CardBlockRequest("123456", "reason"), false))
                 .isInstanceOf(CardException.class)
                 .hasMessageContaining("cannot be blocked");
     }
@@ -230,7 +230,7 @@ class CardServiceTest {
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> cardService.blockCard(cardId, "kc-user-1",
-                new CardBlockRequest("123456", "reason")))
+                new CardBlockRequest("123456", "reason"), false))
                 .isInstanceOf(CardException.class)
                 .hasMessageContaining("Card not found");
     }
@@ -246,7 +246,7 @@ class CardServiceTest {
                 .thenReturn(Optional.of(blockedCard));
         when(cardRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        CardResponse response = cardService.unblockCard(blockedId, "kc-user-1");
+        CardResponse response = cardService.unblockCard(blockedId, "kc-user-1", false);
 
         assertThat(response.status()).isEqualTo(Card.CardStatus.ACTIVE);
         assertThat(blockedCard.getBlockReason()).isNull();
@@ -259,7 +259,7 @@ class CardServiceTest {
         when(cardRepository.findByIdAndKeycloakUserId(cardId, "kc-user-1"))
                 .thenReturn(Optional.of(activeCard));
 
-        assertThatThrownBy(() -> cardService.unblockCard(cardId, "kc-user-1"))
+        assertThatThrownBy(() -> cardService.unblockCard(cardId, "kc-user-1", false))
                 .isInstanceOf(CardException.class)
                 .hasMessageContaining("cannot be unblocked");
     }

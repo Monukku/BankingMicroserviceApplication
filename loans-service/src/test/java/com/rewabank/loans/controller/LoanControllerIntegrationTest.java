@@ -2,6 +2,7 @@ package com.rewabank.loans.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rewabank.loans.client.AccountsFeignClient;
+import com.rewabank.loans.client.FraudFeignClient;
 import com.rewabank.loans.repository.LoanApplicationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
@@ -48,6 +51,9 @@ class LoanControllerIntegrationTest {
     @MockBean
     private AccountsFeignClient accountsFeignClient;
 
+    @MockBean
+    private FraudFeignClient fraudFeignClient;
+
     private UUID customerId;
     private UUID accountId;
 
@@ -72,8 +78,49 @@ class LoanControllerIntegrationTest {
 
     @Test
     void contextLoads() {
-        // Basic context loading test
         assertNotNull(mockMvc);
         assertNotNull(loanRepository);
+    }
+
+    // ── GET /api/v1/loans/my-loans ────────────────────────────────────────────
+
+    @Test
+    void getMyLoans_Returns200_WithEmptyList() throws Exception {
+        mockMvc.perform(get("/api/v1/loans/my-loans"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    // ── GET /api/v1/loans/{id} ────────────────────────────────────────────────
+
+    @Test
+    void getById_Returns404_WhenLoanNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/loans/{id}", UUID.randomUUID()))
+                .andExpect(status().isNotFound());
+    }
+
+    // ── PATCH /api/v1/loans/{id}/review/start — staff only ───────────────────
+
+    @Test
+    void startReview_Returns403_WhenCustomerRole() throws Exception {
+        mockMvc.perform(patch("/api/v1/loans/{id}/review/start", UUID.randomUUID()))
+                .andExpect(status().isForbidden());
+    }
+
+    // ── GET /api/v1/loans — staff only ───────────────────────────────────────
+
+    @Test
+    void getAllLoans_Returns403_WhenCustomerRole() throws Exception {
+        mockMvc.perform(get("/api/v1/loans"))
+                .andExpect(status().isForbidden());
+    }
+
+    // ── PATCH /api/v1/loans/{id}/disburse — staff only ───────────────────────
+
+    @Test
+    void disburse_Returns403_WhenCustomerRole() throws Exception {
+        mockMvc.perform(patch("/api/v1/loans/{id}/disburse", UUID.randomUUID()))
+                .andExpect(status().isForbidden());
     }
 }

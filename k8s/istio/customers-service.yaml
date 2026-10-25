@@ -10,11 +10,7 @@ spec:
     - match:
         - uri:
             prefix: /api/v1
-      timeout: 15s
-      retries:
-        attempts: 2
-        retryOn: gateway-error,reset
-        perTryTimeout: 7s
+      timeout: 60s
       route:
         - destination:
             host: customers-service.banking.svc.cluster.local
@@ -71,7 +67,7 @@ spec:
       to:
         - operation:
             methods: ["GET", "POST", "PATCH"]
-            paths: ["/api/v1/customers/*", "/api/v1/kyc/*"]
+            paths: ["/api/v1/customers", "/api/v1/customers/*", "/api/v1/kyc", "/api/v1/kyc/*"]
     - from:
         - source:
             principals:
@@ -79,7 +75,7 @@ spec:
       to:
         - operation:
             methods: ["GET"]
-            paths: ["/api/v1/customers/*/kyc-status"]
+            paths: ["/api/v1/customers/*"]
     - from:
         - source:
             namespaces: ["monitoring"]

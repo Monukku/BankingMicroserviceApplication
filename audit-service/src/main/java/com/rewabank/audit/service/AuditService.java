@@ -6,7 +6,6 @@ import com.rewabank.audit.repository.AuditLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -20,7 +19,6 @@ public class AuditService {
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper       objectMapper;
 
-    @Transactional
     public void record(Map<String, Object> event, String topic) {
         String eventId = (String) event.getOrDefault(
                 "eventId", UUID.randomUUID().toString());

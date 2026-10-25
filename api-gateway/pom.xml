@@ -57,6 +57,16 @@
 			<artifactId>spring-boot-starter-data-redis-reactive</artifactId>
 		</dependency>
 
+		<!-- ── Bucket4j — distributed rate limiting ── -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j_jdk17-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j_jdk17-lettuce</artifactId>
+		</dependency>
+
 		<!-- ── Observability ─────────────────────────── -->
 		<dependency>
 			<groupId>io.micrometer</groupId>

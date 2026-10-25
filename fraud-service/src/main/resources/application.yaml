@@ -9,12 +9,12 @@ spring:
     name: fraud-ms
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/fraud_db}
-    username: ${DB_USERNAME:fraud_user}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
+      maximum-pool-size: 2
+      minimum-idle: 1
 
   jpa:
     hibernate:
@@ -42,12 +42,15 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: all
     consumer:
-      group-id: fraud-ms
+      group-id: ${KAFKA_CONSUMER_GROUP:fraud-ms}
       auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: ${KAFKA_MAX_POLL_RECORDS:50}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
 
   security:
     oauth2:
@@ -60,6 +63,11 @@ kafka:
   topics:
     alert-raised:  bank.fraud.alert.raised
     alert-cleared: bank.fraud.alert.cleared
+  consumer:
+    groups:
+      transactions: ${KAFKA_FRAUD_TXN_GROUP:fraud-ms-transactions}
+      balance:      ${KAFKA_FRAUD_BALANCE_GROUP:fraud-ms-balance}
+      accounts:     ${KAFKA_FRAUD_ACCOUNTS_GROUP:fraud-ms-accounts}
 
 management:
   endpoints:
@@ -79,7 +87,7 @@ management:
         enabled: true
   tracing:
     sampling:
-      probability: 1.0
+      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
   otlp:
     tracing:
       endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
@@ -92,4 +100,10 @@ logging:
   level:
     com.rewabank: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{rewabank-correlation-id}] [%X{traceId}] %-5level %logger{36} - %msg%n"
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}

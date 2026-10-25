@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 @Service
 @RequiredArgsConstructor
@@ -19,36 +20,53 @@ public class OutboxPublisherService {
     private final OutboxEventRepository         outboxRepo;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
+    private static final int  MAX_RETRIES       = 5;
+    private static final long BASE_DELAY_SECONDS = 5L;
+    private static final long MAX_DELAY_SECONDS  = 300L;
+
     @Transactional
     public void publishPendingEvents() {
-        List<OutboxEvent> pending = outboxRepo.findPendingEvents();
+        List<OutboxEvent> pending = outboxRepo.findPendingEvents(LocalDateTime.now());
         for (OutboxEvent event : pending) {
             try {
-                // FIXED: use get() for synchronous result — async whenComplete
-                // inside @Transactional is unreliable (transaction commits before
-                // callback fires, leaving event in PENDING state permanently)
-                kafkaTemplate.send(event.getTopic(),
+                var result = kafkaTemplate.send(event.getTopic(),
                         event.getAggregateId(), event.getPayload()).get();
 
                 event.setStatus(OutboxEvent.OutboxStatus.PUBLISHED);
                 event.setProcessedAt(LocalDateTime.now());
                 outboxRepo.save(event);
 
-                log.debug("Outbox event published: {} topic: {}",
-                        event.getEventType(), event.getTopic());
+                log.debug("Outbox event published: {} offset: {}",
+                        event.getEventType(), result.getRecordMetadata().offset());
 
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                handleFailure(event, "Interrupted: " + e.getMessage());
+            } catch (ExecutionException e) {
+                handleFailure(event, e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
             } catch (Exception e) {
-                log.error("Outbox publish failed for event {}: {}",
-                        event.getId(), e.getMessage());
-                event.setRetryCount(event.getRetryCount() + 1);
-                event.setLastError(e.getMessage());
-                if (event.getRetryCount() >= 5) {
-                    event.setStatus(OutboxEvent.OutboxStatus.FAILED);
-                    log.error("Outbox event {} permanently failed after 5 retries",
-                            event.getId());
-                }
-                outboxRepo.save(event);
+                handleFailure(event, e.getMessage());
             }
         }
+    }
+
+    private void handleFailure(OutboxEvent event, String error) {
+        int retries = event.getRetryCount() + 1;
+        event.setRetryCount(retries);
+        event.setLastError(error);
+
+        if (retries >= MAX_RETRIES) {
+            event.setStatus(OutboxEvent.OutboxStatus.FAILED);
+            log.error("Loans outbox event FAILED after {} retries: {} error: {}",
+                    MAX_RETRIES, event.getEventType(), error);
+        } else {
+            long delaySecs = Math.min(
+                    (long) Math.pow(2, retries) * BASE_DELAY_SECONDS,
+                    MAX_DELAY_SECONDS);
+            event.setNextRetryAt(LocalDateTime.now().plusSeconds(delaySecs));
+            log.warn("Loans outbox retry {}/{} in {}s: {} error: {}",
+                    retries, MAX_RETRIES - 1, delaySecs, event.getEventType(), error);
+        }
+        outboxRepo.save(event);
     }
 }

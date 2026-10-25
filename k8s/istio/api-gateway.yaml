@@ -1,5 +1,12 @@
-# Istio Gateway in istio-system — opens port 80 to external traffic
-# Routes /auth directly to Keycloak, /api/v1 to api-gateway-service
+# Istio Gateway — entry point for all external traffic.
+#
+# HTTPS is handled by Cloudflare Tunnel at the edge — this gateway stays on HTTP port 80.
+# Cloudflare → cloudflared (on laptop) → localhost:80 → here → services
+#
+# If moving to a cloud server without Cloudflare Tunnel, switch to HTTPS by:
+#   1. Installing cert-manager + applying k8s/tls-certificate.yaml (Let's Encrypt section)
+#   2. Replacing the server block below with the HTTPS + redirect config
+#   3. Updating hosts from "*" to your real domain
 apiVersion: networking.istio.io/v1beta1
 kind: Gateway
 metadata:
@@ -51,6 +58,17 @@ spec:
               number: 8072
     - match:
         - uri:
+            prefix: /api/v1/kyc
+      timeout: 60s
+      retries:
+        attempts: 0
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+            port:
+              number: 8072
+    - match:
+        - uri:
             prefix: /api/v1
       route:
         - destination:
@@ -58,6 +76,10 @@ spec:
             port:
               number: 8072
       timeout: 30s
+      retries:
+        attempts: 2
+        retryOn: connect-failure,reset,gateway-error
+        perTryTimeout: 10s
 ---
 # Internal mesh VirtualService — controls behaviour for service-to-service calls to api-gateway
 apiVersion: networking.istio.io/v1beta1
@@ -94,6 +116,15 @@ spec:
       retries:
         attempts: 1
         retryOn: gateway-error,reset
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+    - match:
+        - uri:
+            prefix: /api/v1/kyc
+      timeout: 60s
+      retries:
+        attempts: 0
       route:
         - destination:
             host: api-gateway-service.banking.svc.cluster.local

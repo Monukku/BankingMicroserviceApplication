@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -103,13 +102,9 @@ public class Transaction {
     private LocalDateTime updatedAt;
 
     public enum TransactionType {
-        TRANSFER,           // account to account
-        NEFT,
-        RTGS,
-        IMPS,
-        UPI,
-        BILL_PAYMENT,
-        REVERSAL
+        TRANSFER,   // internal account-to-account within RewaBank
+        REVERSAL,   // saga compensation
+        DEPOSIT     // external credit via Razorpay
     }
 
     public enum TransactionStatus {

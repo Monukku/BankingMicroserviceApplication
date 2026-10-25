@@ -10,19 +10,21 @@ spring:
 
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://mongodb-service.banking.svc.cluster.local:27017/notifications_db}
+      uri: ${MONGODB_URI}
       auto-index-creation: true
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-kafka-bootstrap.banking.svc.cluster.local:9092}
     consumer:
-      group-id: notifications-ms
+      group-id: ${KAFKA_CONSUMER_GROUP:notifications-ms}
       auto-offset-reset: earliest
       enable-auto-commit: false
+      max-poll-records: ${KAFKA_MAX_POLL_RECORDS:50}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
 
   security:
     oauth2:
@@ -49,13 +51,25 @@ management:
         enabled: true
   tracing:
     sampling:
-      probability: 1.0
+      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
   otlp:
     tracing:
       endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
 
 # ── Notification provider config ─────────────────────────────────────────────
 # Set simulation.mode=false in production and supply provider credentials.
+kafka:
+  consumer:
+    groups:
+      accounts:     ${KAFKA_NOTIF_ACCOUNTS_GROUP:notifications-ms-accounts}
+      transactions: ${KAFKA_NOTIF_TXN_GROUP:notifications-ms-transactions}
+      balance:      ${KAFKA_NOTIF_BALANCE_GROUP:notifications-ms-balance}
+      fraud:        ${KAFKA_NOTIF_FRAUD_GROUP:notifications-ms-fraud}
+      loans:        ${KAFKA_NOTIF_LOANS_GROUP:notifications-ms-loans}
+      payments:     ${KAFKA_NOTIF_PAYMENTS_GROUP:notifications-ms-payments}
+      cards:        ${KAFKA_NOTIF_CARDS_GROUP:notifications-ms-cards}
+      users:        ${KAFKA_NOTIF_USERS_GROUP:notifications-ms-users}
+
 notification:
   simulation:
     mode: ${NOTIFICATION_SIMULATION_MODE:true}
@@ -77,4 +91,4 @@ logging:
     com.rewabank: INFO
     org.springframework.kafka: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{rewabank-correlation-id}] [%X{traceId}] %-5level %logger{36} - %msg%n"

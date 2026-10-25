@@ -120,7 +120,7 @@ class AccountServiceTest {
         // Arrange
         account.setStatus(Account.AccountStatus.PENDING);
         when(accountsRepository.findByIdAndDeletedAtIsNull(account.getId())).thenReturn(Optional.of(account));
-        when(customersFeignClient.getKycStatus(account.getCustomerId())).thenReturn(new KycStatusResponse(account.getCustomerId().toString(), account.getKeycloakUserId(), "VERIFIED", true, "KYC verified successfully"));
+        when(customersFeignClient.getKycStatus(account.getCustomerId())).thenReturn(new KycStatusResponse(account.getCustomerId().toString(), account.getKeycloakUserId(), "VERIFIED", true, "KYC verified successfully", "Test User", "test@rewabank.com", "9999999999"));
 
         // Act
         AccountResponse response = accountService.activateAccount(account.getId());
@@ -388,7 +388,8 @@ class AccountServiceTest {
                 .thenReturn(Optional.of(account));
         when(customersFeignClient.getKycStatus(account.getCustomerId()))
                 .thenReturn(new KycStatusResponse(account.getCustomerId().toString(),
-                        account.getKeycloakUserId(), "PENDING", false, "KYC pending"));
+                        account.getKeycloakUserId(), "PENDING", false, "KYC pending",
+                        null, null, null));
 
         AccountException ex = assertThrows(AccountException.class,
                 () -> accountService.activateAccount(account.getId()));

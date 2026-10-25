@@ -1,4 +1,5 @@
-Creating and managing a number of microservices effectively requires careful planning and consideration of 
+
+Creating and managing a number of microservices effectively requires careful planning and consideration of
 various factors, including scalability, maintainability, and performance. Here’s a structured approach to determine 
 the number of microservices for the OTP and email verification requirements:
 

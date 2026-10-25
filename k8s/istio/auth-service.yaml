@@ -71,7 +71,7 @@ spec:
               - "cluster.local/ns/banking/sa/api-gateway-sa"
       to:
         - operation:
-            methods: ["GET", "POST"]
+            methods: ["GET", "POST", "PATCH", "DELETE"]
             paths: ["/api/v1/auth/*"]
     - from:
         - source:

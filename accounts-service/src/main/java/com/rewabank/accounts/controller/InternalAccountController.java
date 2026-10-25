@@ -9,12 +9,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.UUID;
 
 /**
  * Internal endpoints — called by Transactions MS via Feign (mTLS verified by Istio).
  * NOT exposed via API Gateway — authz-policy restricts to transactions-ms-sa only.
+ * GET by ID is served by AccountController — no duplicate here.
  */
 @RestController
 @RequestMapping("/api/v1/accounts")

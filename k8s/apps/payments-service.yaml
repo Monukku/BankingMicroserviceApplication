@@ -1,0 +1,163 @@
+﻿apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: payments-ms-sa
+  namespace: banking
+  labels:
+    app: payments-ms
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payments-ms-config
+  namespace: banking
+data:
+  DB_URL:              "jdbc:postgresql://ep-spring-bar-az9ane6a-pooler.c-3.ap-southeast-1.aws.neon.tech:5432/payments_db?sslmode=require"
+  KEYCLOAK_ISSUER_URI: "https://api.rewarealm.com/auth/realms/rewabank"
+  KEYCLOAK_JWKS_URI:   "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs"
+  REDIS_HOST:          "valkey.banking.svc.cluster.local"
+  REDIS_PORT:          "6379"
+  KAFKA_BOOTSTRAP_SERVERS:  "kafka-kafka-bootstrap.banking.svc.cluster.local:9092"
+  ACCOUNTS_SERVICE_URL:     "http://accounts-service.banking.svc.cluster.local:8081"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-ms
+  namespace: banking
+  labels:
+    app: payments-ms
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payments-ms
+  template:
+    metadata:
+      labels:
+        app: payments-ms
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8083"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      serviceAccountName: payments-ms-sa
+      containers:
+        - name: payments-ms
+          image: rewabank/payments-service:latest
+          ports:
+            - containerPort: 8083
+          envFrom:
+            - configMapRef:
+                name: payments-ms-config
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payments-db-secret
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payments-db-secret
+                  key: password
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+            - name: RAZORPAY_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: razorpay-secret
+                  key: key-id
+            - name: RAZORPAY_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: razorpay-secret
+                  key: key-secret
+            - name: RAZORPAY_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: razorpay-secret
+                  key: webhook-secret
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8083
+            failureThreshold: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8083
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8083
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments-service
+  namespace: banking
+  labels:
+    app: payments-ms
+spec:
+  selector:
+    app: payments-ms
+  ports:
+    - name: http
+      port: 8083
+      targetPort: 8083
+      protocol: TCP
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payments-ms-hpa
+  namespace: banking
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payments-ms
+  minReplicas: 1
+  maxReplicas: 1
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payments-ms-pdb
+  namespace: banking
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: payments-ms

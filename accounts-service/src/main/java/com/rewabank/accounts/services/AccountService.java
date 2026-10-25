@@ -2,6 +2,7 @@ package com.rewabank.accounts.services;
 
 import com.rewabank.accounts.client.CustomersFeignClient;
 import com.rewabank.accounts.dto.AccountCreateRequest;
+import com.rewabank.accounts.dto.AccountLookupResponse;
 import com.rewabank.accounts.dto.AccountResponse;
 import com.rewabank.accounts.dto.KycStatusResponse;
 import com.rewabank.accounts.entity.Account;
@@ -79,10 +80,18 @@ public class AccountService {
 
         Account savedAccount = accountRepository.save(account);
 
+        // Fetch KYC response to enrich Kafka event with contact details (best-effort)
+        KycStatusResponse kyc = null;
+        try {
+            kyc = customersFeignClient.getKycStatus(customerId);
+        } catch (Exception e) {
+            log.warn("Could not fetch KYC contact details for event enrichment — sending without: {}", e.getMessage());
+        }
+
         // Save outbox event in SAME transaction — guaranteed delivery
         outboxEventSaver.save(savedAccount.getId().toString(),
                 EVT_ACCOUNT_CREATED, TOPIC_ACCOUNT_CREATED,
-                buildAccountPayload(savedAccount, EVT_ACCOUNT_CREATED));
+                buildAccountPayload(savedAccount, EVT_ACCOUNT_CREATED, kyc));
 
         log.info("Account created: {} status: PENDING for customer: {}",
                 accountNumber, customerId);
@@ -217,6 +226,32 @@ public class AccountService {
         return toResponse(account);
     }
 
+    // ── Reject pending account (teller) ──────────────────────────────────────
+    @Transactional
+    public AccountResponse rejectAccount(UUID accountId, String reason) {
+        Account account = accountRepository
+                .findByIdAndDeletedAtIsNull(accountId)
+                .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
+
+        if (account.getStatus() != Account.AccountStatus.PENDING) {
+            throw new AccountException("ACCT_003",
+                    "Only PENDING accounts can be rejected. Current status: " + account.getStatus());
+        }
+
+        account.setStatus(Account.AccountStatus.CLOSED);
+        account.setClosedAt(LocalDateTime.now());
+        account.setFrozenReason(reason != null ? reason : "Rejected by teller");
+        accountRepository.save(account);
+
+        outboxEventSaver.save(account.getId().toString(),
+                EVT_ACCOUNT_CLOSED, TOPIC_ACCOUNT_CLOSED,
+                buildAccountPayload(account, EVT_ACCOUNT_CLOSED));
+
+        log.info("Pending account rejected: {} reason: {}", account.getAccountNumber(),
+                reason == null ? "" : reason.replaceAll("[\r\n]", "_"));
+        return toResponse(account);
+    }
+
     // ── Freeze account ────────────────────────────────────────────────────────
     @Transactional
     @PreAuthorize("hasAnyRole('BRANCH_MANAGER','SUPER_ADMIN')")
@@ -339,10 +374,24 @@ public class AccountService {
         return number;
     }
 
-    private BigDecimal minimumBalanceFor(Account.AccountType type) {
+    @Transactional(readOnly = true)
+    public AccountLookupResponse lookupByAccountNumber(String accountNumber) {
+        Account account = accountRepository
+                .findByAccountNumberAndDeletedAtIsNull(accountNumber)
+                .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
+        return new AccountLookupResponse(
+                account.getId(),
+                account.getAccountNumber(),
+                account.getIfscCode(),
+                account.getStatus()
+        );
+    }
+
+    public static BigDecimal minimumBalanceFor(Account.AccountType type) {
         return switch (type) {
-            case SAVINGS          -> new BigDecimal("1000.00");
-            case CURRENT          -> new BigDecimal("10000.00");
+            case SAVINGS           -> new BigDecimal("1000.00");
+            case CURRENT           -> new BigDecimal("10000.00");
+            case BUSINESS          -> new BigDecimal("5000.00");
             case SALARY,
                  FIXED_DEPOSIT,
                  RECURRING_DEPOSIT -> BigDecimal.ZERO;
@@ -350,17 +399,27 @@ public class AccountService {
     }
 
     private Map<String, Object> buildAccountPayload(Account a, String eventType) {
-        return Map.of(
-                "eventType",     eventType,
-                "accountId",     a.getId().toString(),
-                "accountNumber", a.getAccountNumber(),
-                "customerId",    a.getCustomerId().toString(),
-                "keycloakUserId",a.getKeycloakUserId(),
-                "accountType",   a.getAccountType().name(),
-                "status",        a.getStatus().name(),
-                "currency",      a.getCurrency(),
-                "occurredAt",    LocalDateTime.now().toString()
-        );
+        return buildAccountPayload(a, eventType, null);
+    }
+
+    private Map<String, Object> buildAccountPayload(Account a, String eventType,
+                                                     KycStatusResponse kyc) {
+        Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("eventType",      eventType);
+        payload.put("accountId",      a.getId().toString());
+        payload.put("accountNumber",  a.getAccountNumber());
+        payload.put("customerId",     a.getCustomerId().toString());
+        payload.put("keycloakUserId", a.getKeycloakUserId());
+        payload.put("accountType",    a.getAccountType().name());
+        payload.put("status",         a.getStatus().name());
+        payload.put("currency",       a.getCurrency());
+        payload.put("occurredAt",     LocalDateTime.now().toString());
+        if (kyc != null) {
+            payload.put("fullName",     kyc.fullName()     != null ? kyc.fullName()     : "");
+            payload.put("email",        kyc.email()        != null ? kyc.email()        : "");
+            payload.put("mobileNumber", kyc.mobileNumber() != null ? kyc.mobileNumber() : "");
+        }
+        return payload;
     }
 
     private Map<String, Object> buildBalancePayload(Account a, BigDecimal amount,
@@ -386,7 +445,11 @@ public class AccountService {
                 a.getId(), a.getAccountNumber(), a.getKeycloakUserId(),
                 a.getCustomerId(), a.getAccountType(), a.getStatus(),
                 a.getBalance(), a.getCurrency(), a.getBranchCode(),
-                a.getIfscCode(), a.getActivatedAt(), a.getCreatedAt()
+                a.getIfscCode(), a.getActivatedAt(), a.getCreatedAt(),
+                a.getDepositAmount(), a.getTenureMonths(), a.getInterestRate(),
+                a.getMaturityDate(), a.getSourceAccountId(),
+                a.getInstallmentAmount(), a.getNextInstallmentDate(), a.getMaturedAt(),
+                a.getEmployerName(), a.getEmployerCode()
         );
     }
 
@@ -402,5 +465,12 @@ public class AccountService {
         return accountRepository.findByIdAndDeletedAtIsNull(id)
                 .map(this::toResponse)
                 .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
+    }
+
+    public List<AccountResponse> getAccountsByStatus(Account.AccountStatus status) {
+        return accountRepository.findByStatusAndDeletedAtIsNull(status)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 }

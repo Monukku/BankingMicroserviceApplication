@@ -12,13 +12,13 @@ spring:
       circuitbreaker:
         enabled: true
   datasource:
-    url: ${DB_URL:jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/accounts_db}
-    username: ${DB_USERNAME:accounts_user}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
-      maximum-pool-size: 25
+      maximum-pool-size: 10
       minimum-idle: 5
-      connection-timeout: 30000
+      connection-timeout: 5000
       idle-timeout: 600000
       keepalive-time: 30000
   jpa:
@@ -43,16 +43,20 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-kafka-bootstrap.banking.svc.cluster.local:9092}
     consumer:
-      group-id: accounts-ms
+      group-id: ${KAFKA_CONSUMER_GROUP:accounts-ms}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: ${KAFKA_MAX_POLL_RECORDS:50}
       properties:
         spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
   security:
     oauth2:
       resourceserver:
         jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank}
           jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs}
 
 kafka:
@@ -68,6 +72,10 @@ kafka:
 customers:
   service:
     url: ${CUSTOMERS_SERVICE_URL:http://customers-service.banking.svc.cluster.local:8080}
+
+internal:
+  call:
+    secret: ${INTERNAL_CALL_SECRET}
 
 resilience4j:
   circuitbreaker:
@@ -102,10 +110,16 @@ management:
         enabled: true
   tracing:
     sampling:
-      probability: 1.0
+      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
   otlp:
     tracing:
       endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
 
 logging:
   level:

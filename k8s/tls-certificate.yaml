@@ -1,0 +1,76 @@
+# TLS certificate for RewaBank — two modes depending on environment:
+#
+#   LOCAL (k3d, no domain)
+#     Uses cert-manager's SelfSigned issuer.
+#     Browser will show a "certificate not trusted" warning — click through once.
+#     No DNS, no domain, no internet access required.
+#     Apply: kubectl apply -f k8s/tls-certificate.yaml
+#
+#   PRODUCTION (real domain, public cluster)
+#     Swap the Certificate's issuerRef to letsencrypt-prod (section at bottom).
+#     Requires cert-manager installed + DNS A record pointing to cluster IP.
+#
+# Install cert-manager (required for both modes):
+#   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+#   kubectl wait --for=condition=Available deploy -n cert-manager --all --timeout=120s
+#
+# Watch cert issuance:
+#   kubectl get certificate rewabank-tls -n istio-system -w
+
+# ── LOCAL: SelfSigned issuer — no domain, no DNS needed ─────────────────────
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+
+---
+# ── LOCAL: Certificate valid for localhost + 127.0.0.1 ──────────────────────
+# Istio Ingress Gateway reads this Secret to serve HTTPS.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: rewabank-tls
+  namespace: istio-system          # must be in istio-system for Istio to read it
+spec:
+  secretName: rewabank-tls-secret  # referenced by Gateway.spec.servers[].tls.credentialName
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+  dnsNames:
+    - localhost
+  ipAddresses:
+    - 127.0.0.1
+
+---
+# ── PRODUCTION: uncomment below and delete the LOCAL Certificate above ───────
+# Requires a real domain pointing to your cluster's public IP.
+#
+# apiVersion: cert-manager.io/v1
+# kind: ClusterIssuer
+# metadata:
+#   name: letsencrypt-prod
+# spec:
+#   acme:
+#     server: https://acme-v02.api.letsencrypt.org/directory
+#     email: kumarmonusonu987@gmail.com
+#     privateKeySecretRef:
+#       name: letsencrypt-prod-account-key
+#     solvers:
+#       - http01:
+#           ingress:
+#             class: istio
+#
+# apiVersion: cert-manager.io/v1
+# kind: Certificate
+# metadata:
+#   name: rewabank-tls
+#   namespace: istio-system
+# spec:
+#   secretName: rewabank-tls-secret
+#   issuerRef:
+#     name: letsencrypt-prod
+#     kind: ClusterIssuer
+#   dnsNames:
+#     - api.YOUR-DOMAIN.com

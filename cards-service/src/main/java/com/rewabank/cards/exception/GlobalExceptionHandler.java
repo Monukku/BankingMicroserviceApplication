@@ -22,9 +22,11 @@ public class GlobalExceptionHandler {
             CardException ex, WebRequest request) {
 
         HttpStatus status = switch (ex.getErrorCode()) {
-            case "CARD_001" -> HttpStatus.NOT_FOUND;
-            case "CARD_002" -> HttpStatus.BAD_REQUEST;
-            default         -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case "CARD_001"       -> HttpStatus.NOT_FOUND;
+            case "CARD_002",
+                 "CARD_003"       -> HttpStatus.BAD_REQUEST;
+            case "CARD_403"       -> HttpStatus.FORBIDDEN;
+            default               -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
 
         log.warn("CardException [{}]: {}", ex.getErrorCode(), ex.getMessage());

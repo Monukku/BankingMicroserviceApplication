@@ -2,13 +2,17 @@ package com.rewabank.transactions.service;
 
 import com.rewabank.transactions.entity.OutboxEvent;
 import com.rewabank.transactions.repository.OutboxEventRepository;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -35,8 +39,8 @@ class OutboxPublisherServiceTest {
 
     @Test
     void publishPendingEvents_emptyList_doesNotCallKafka() {
-        when(outboxRepo.findPendingEvents()).thenReturn(List.of());
-        outboxPublisherService.publishPendingEvents();
+        when(outboxRepo.findPendingEvents(any())).thenReturn(List.of());
+        outboxPublisherService.publishPendingEvents(LocalDateTime.now());
         verify(kafkaTemplate, never()).send(any(), any(), any());
     }
 
@@ -44,11 +48,16 @@ class OutboxPublisherServiceTest {
     @SuppressWarnings("unchecked")
     void publishPendingEvents_success_setsStatusPublishedAndSaves() {
         OutboxEvent event = pendingEvent(0);
-        when(outboxRepo.findPendingEvents()).thenReturn(List.of(event));
-        when(kafkaTemplate.send(anyString(), anyString(), any()))
-                .thenReturn(CompletableFuture.completedFuture(null));
+        when(outboxRepo.findPendingEvents(any())).thenReturn(List.of(event));
 
-        outboxPublisherService.publishPendingEvents();
+        RecordMetadata meta = new RecordMetadata(
+                new TopicPartition("bank.transaction.completed", 0), 0L, 0, 0L, 0, 0);
+        SendResult<String, Object> sendResult = mock(SendResult.class);
+        when(sendResult.getRecordMetadata()).thenReturn(meta);
+        when(kafkaTemplate.send(anyString(), anyString(), any()))
+                .thenReturn(CompletableFuture.completedFuture(sendResult));
+
+        outboxPublisherService.publishPendingEvents(LocalDateTime.now());
 
         // Kills VoidMethodCall on event.setStatus() and outboxRepo.save()
         assertThat(event.getStatus()).isEqualTo(OutboxEvent.OutboxStatus.PUBLISHED);
@@ -59,11 +68,11 @@ class OutboxPublisherServiceTest {
     @SuppressWarnings("unchecked")
     void publishPendingEvents_kafkaFails_incrementsRetryAndSaves() {
         OutboxEvent event = pendingEvent(0);
-        when(outboxRepo.findPendingEvents()).thenReturn(List.of(event));
+        when(outboxRepo.findPendingEvents(any())).thenReturn(List.of(event));
         when(kafkaTemplate.send(anyString(), anyString(), any()))
                 .thenReturn(CompletableFuture.failedFuture(new RuntimeException("Kafka down")));
 
-        outboxPublisherService.publishPendingEvents();
+        outboxPublisherService.publishPendingEvents(LocalDateTime.now());
 
         // Kills VoidMethodCall on setRetryCount + outboxRepo.save() in handleFailure
         assertThat(event.getRetryCount()).isEqualTo(1);
@@ -78,11 +87,11 @@ class OutboxPublisherServiceTest {
     void publishPendingEvents_atRetryLimit_marksAsFailed() {
         // Kills ConditionalsBoundary on: retryCount >= 5
         OutboxEvent event = pendingEvent(4);   // will become 5 after increment → FAILED
-        when(outboxRepo.findPendingEvents()).thenReturn(List.of(event));
+        when(outboxRepo.findPendingEvents(any())).thenReturn(List.of(event));
         when(kafkaTemplate.send(anyString(), anyString(), any()))
                 .thenReturn(CompletableFuture.failedFuture(new RuntimeException("timeout")));
 
-        outboxPublisherService.publishPendingEvents();
+        outboxPublisherService.publishPendingEvents(LocalDateTime.now());
 
         assertThat(event.getRetryCount()).isEqualTo(5);
         assertThat(event.getStatus()).isEqualTo(OutboxEvent.OutboxStatus.FAILED);
@@ -94,11 +103,11 @@ class OutboxPublisherServiceTest {
     void publishPendingEvents_belowRetryLimit_doesNotMarkFailed() {
         // Kills ConditionalsBoundary: retryCount = 3 → becomes 4, NOT FAILED
         OutboxEvent event = pendingEvent(3);
-        when(outboxRepo.findPendingEvents()).thenReturn(List.of(event));
+        when(outboxRepo.findPendingEvents(any())).thenReturn(List.of(event));
         when(kafkaTemplate.send(anyString(), anyString(), any()))
                 .thenReturn(CompletableFuture.failedFuture(new RuntimeException("err")));
 
-        outboxPublisherService.publishPendingEvents();
+        outboxPublisherService.publishPendingEvents(LocalDateTime.now());
 
         assertThat(event.getRetryCount()).isEqualTo(4);
         assertThat(event.getStatus()).isNotEqualTo(OutboxEvent.OutboxStatus.FAILED);

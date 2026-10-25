@@ -49,7 +49,7 @@ public class FraudController {
                 "accountId",      accountId.toString(),
                 "score",          result.score(),
                 "action",         result.action(),
-                "reason",         result.triggeredRules(),
+                "reason",         String.join(", ", result.triggeredRules()),
                 "correlationId",  correlationId
         ));
     }

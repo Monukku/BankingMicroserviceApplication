@@ -5,11 +5,6 @@ import com.rewabank.customers.entity.KycDocument;
 import com.rewabank.customers.exception.CustomerException;
 import com.rewabank.customers.repository.CustomerRepository;
 import com.rewabank.customers.repository.KycDocumentRepository;
-import com.rewabank.customers.services.DocumentService;
-import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.MinioClient;
-import io.minio.ObjectWriteResponse;
-import io.minio.PutObjectArgs;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +13,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
+import java.net.URL;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,7 +33,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class DocumentServiceTest {
 
-    @Mock MinioClient           minioClient;
+    @Mock S3Client              s3Client;
+    @Mock S3Presigner           s3Presigner;
     @Mock KycDocumentRepository documentRepository;
     @Mock CustomerRepository    customerRepository;
 
@@ -41,7 +45,6 @@ class DocumentServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Inject bucket name — @Value does not work with @InjectMocks
         ReflectionTestUtils.setField(documentService, "bucketName", "rewabank-kyc-docs");
 
         customerId = UUID.randomUUID();
@@ -66,11 +69,11 @@ class DocumentServiceTest {
     // ── uploadDocument ────────────────────────────────────────────────────────
 
     @Test
-    void uploadDocument_validJpeg_savesDocumentRecord() throws Exception {
+    void uploadDocument_validJpeg_savesDocumentRecord() {
         when(customerRepository.findByKeycloakUserIdAndDeletedAtIsNull("kc-user-1"))
                 .thenReturn(Optional.of(customer));
-        when(minioClient.putObject(any(PutObjectArgs.class)))
-                .thenReturn(mock(ObjectWriteResponse.class));
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().build());
         KycDocument saved = KycDocument.builder()
                 .id(UUID.randomUUID())
                 .customerId(customerId)
@@ -87,16 +90,16 @@ class DocumentServiceTest {
 
         assertThat(result.getCustomerId()).isEqualTo(customerId);
         assertThat(result.getDocumentType()).isEqualTo(KycDocument.DocumentType.AADHAAR_FRONT);
-        verify(minioClient).putObject(any(PutObjectArgs.class));
+        verify(s3Client).putObject(any(PutObjectRequest.class), any(RequestBody.class));
         verify(documentRepository).save(any(KycDocument.class));
     }
 
     @Test
-    void uploadDocument_validPdf_accepted() throws Exception {
+    void uploadDocument_validPdf_accepted() {
         when(customerRepository.findByKeycloakUserIdAndDeletedAtIsNull("kc-user-1"))
                 .thenReturn(Optional.of(customer));
-        when(minioClient.putObject(any(PutObjectArgs.class)))
-                .thenReturn(mock(ObjectWriteResponse.class));
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().build());
         when(documentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         assertThatCode(() -> documentService.uploadDocument(
@@ -150,11 +153,11 @@ class DocumentServiceTest {
     }
 
     @Test
-    void uploadDocument_minioFails_throwsUploadException() throws Exception {
+    void uploadDocument_s3Fails_throwsUploadException() {
         when(customerRepository.findByKeycloakUserIdAndDeletedAtIsNull("kc-user-1"))
                 .thenReturn(Optional.of(customer));
-        when(minioClient.putObject(any(PutObjectArgs.class)))
-                .thenThrow(new RuntimeException("MinIO unreachable"));
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenThrow(new RuntimeException("S3 unreachable"));
 
         assertThatThrownBy(() -> documentService.uploadDocument(
                 "kc-user-1", KycDocument.DocumentType.AADHAAR_FRONT, validJpeg("a.jpg")))
@@ -164,7 +167,6 @@ class DocumentServiceTest {
 
     @Test
     void uploadDocument_noExtensionInFilename_throwsExtensionNotAllowed() {
-        // Service rejects files with no recognised extension — .bin is NOT in allowed list
         MockMultipartFile noExt = new MockMultipartFile(
                 "file", "noext", "image/jpeg", new byte[512]);
         when(customerRepository.findByKeycloakUserIdAndDeletedAtIsNull("kc-user-1"))
@@ -187,13 +189,15 @@ class DocumentServiceTest {
                 .minioObjectKey("kyc/path/to/doc.jpg")
                 .build();
         when(documentRepository.findById(docId)).thenReturn(Optional.of(doc));
-        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
-                .thenReturn("https://minio.rewabank.local/presigned/doc.jpg?token=abc");
+
+        PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
+        when(presigned.url()).thenReturn(new URL("https://b2.backblaze.com/presigned/doc.jpg?token=abc"));
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presigned);
 
         String url = documentService.getDocumentViewUrl(docId, "test-user-id");
 
         assertThat(url).contains("presigned");
-        verify(minioClient).getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class));
+        verify(s3Presigner).presignGetObject(any(GetObjectPresignRequest.class));
     }
 
     @Test
@@ -207,15 +211,15 @@ class DocumentServiceTest {
     }
 
     @Test
-    void getDocumentViewUrl_minioFails_throws() throws Exception {
+    void getDocumentViewUrl_s3Fails_throws() {
         UUID docId = UUID.randomUUID();
         KycDocument doc = KycDocument.builder()
                 .id(docId)
                 .minioObjectKey("kyc/path/doc.pdf")
                 .build();
         when(documentRepository.findById(docId)).thenReturn(Optional.of(doc));
-        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
-                .thenThrow(new RuntimeException("MinIO timeout"));
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenThrow(new RuntimeException("S3 timeout"));
 
         assertThatThrownBy(() -> documentService.getDocumentViewUrl(docId, "test-user-id"))
                 .isInstanceOf(CustomerException.class)

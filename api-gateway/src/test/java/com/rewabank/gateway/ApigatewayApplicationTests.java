@@ -11,7 +11,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
     "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost:9999/realms/test/protocol/openid-connect/certs",
     "CORS_ORIGIN_WEB=http://localhost:4200",
     "CORS_ORIGIN_MOBILE=http://localhost:3000",
-    "build.version=1.0.0"
+    "build.version=1.0.0",
+    "rate-limiting.enabled=false"
 })
 class ApigatewayApplicationTests {
 

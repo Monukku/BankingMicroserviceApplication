@@ -25,8 +25,8 @@ spring:
       host: ${REDIS_HOST:valkey.banking.svc.cluster.local}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD}   # injected from K8s Secret
-      connect-timeout: 2s
-      timeout: 1s
+      connect-timeout: 5s
+      timeout: 5s
 
   cloud:
     gateway:
@@ -34,6 +34,19 @@ spring:
       httpclient:
         connect-timeout: 1000
         response-timeout: 15s
+
+# Rate limiting (bucket4j + Redis)
+rate-limiting:
+  enabled: true
+  general:
+    capacity: 5                    # 20 req/s per user — general API paths
+    refill-period-seconds: 1
+  financial:
+    capacity: 5                     # 5 req/s per user — transactions + payments
+    refill-period-seconds: 1
+  auth:
+    capacity: 5                    # 10 req/min per IP — login + register
+    refill-period-seconds: 60
 
 # CORS — override per environment via K8s ConfigMap
 cors:
@@ -46,11 +59,24 @@ resilience4j:
   circuitbreaker:
     configs:
       default:
-        sliding-window-size: 10
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 10s
-        permitted-number-of-calls-in-half-open-state: 2
+        sliding-window-size: 20
+        # Don't judge the failure rate until a real sample exists. A cold-start burst
+        # of a handful of slow calls (Neon wakeup + JIT warm-up) must NOT open the breaker.
+        minimum-number-of-calls: 20
+        # Require a clear majority of failures, not a transient half, before tripping.
+        failure-rate-threshold: 60
+        # Recover fast once the downstream warms up (was 10s of blanket 503).
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
         register-health-indicator: true
+        # Only genuine downstream failures trip the breaker. Backend 4xx/5xx come back as
+        # responses (not exceptions) and client-status exceptions must never count — only
+        # timeouts (TimeLimiter) and transport/IO errors do. Replaces the old Java
+        # recordException predicate; inherited by every instance via base-config: default.
+        record-exceptions:
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
     instances:
       # Transactions — fast fail, no retry
       transactionsCircuitBreaker:
@@ -62,12 +88,13 @@ resilience4j:
         base-config: default
         sliding-window-size: 20
         failure-rate-threshold: 40
-      # Fraud — aggressive, 3s timeout
+      # Fraud — 3s timeout; window widened so a short burst can't pin the breaker open
       fraudCircuitBreaker:
         base-config: default
-        sliding-window-size: 5
-        failure-rate-threshold: 30
+        sliding-window-size: 20
+        failure-rate-threshold: 50
         wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 5
       # Accounts
       accountsCircuitBreaker:
         base-config: default
@@ -88,6 +115,16 @@ resilience4j:
         timeout-duration: 10s       # transactions can take longer
       paymentCircuitBreaker:
         timeout-duration: 15s       # payments (NEFT/RTGS) can be slower
+      authCircuitBreaker:
+        timeout-duration: 15s       # register makes 4 Keycloak calls — needs extra time
+      accountsCircuitBreaker:
+        timeout-duration: 10s       # account creation involves Feign call to customers-service
+      loansCircuitBreaker:
+        timeout-duration: 10s
+      cardsCircuitBreaker:
+        timeout-duration: 10s
+      customersCircuitBreaker:
+        timeout-duration: 10s
 
 # Actuator
 management:
@@ -101,7 +138,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,gateway,refresh
+        include: health,info,prometheus,gateway,refresh,circuitbreakers,circuitbreakerevents
   metrics:
     tags:
       application: ${spring.application.name}
@@ -110,7 +147,7 @@ management:
         enabled: true
   tracing:
     sampling:
-      probability: 1.0              # 100% sampling — OTel Collector filters
+      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
   otlp:
     tracing:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
@@ -123,6 +160,12 @@ logging:
   pattern:
     level: "%5p[${spring.application.name},%X{traceId},%X{spanId}]"
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{rewabank-correlation-id}] [%X{traceId}] %-5level %logger{36} - %msg%n"
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
 
 info:
   app:

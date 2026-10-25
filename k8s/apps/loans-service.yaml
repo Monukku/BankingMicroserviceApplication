@@ -14,8 +14,8 @@ metadata:
 data:
   DB_URL:               "jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/loans_db"
   KAFKA_BOOTSTRAP:      "kafka-kafka-bootstrap.banking.svc.cluster.local:9092"
-  KEYCLOAK_ISSUER_URI:  "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank"
-  KEYCLOAK_JWKS_URI:    "http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs"
+  KEYCLOAK_ISSUER_URI: "https://api.rewarealm.com/auth/realms/rewabank"
+  KEYCLOAK_JWKS_URI:    "http://keycloak-keycloakx-http.keycloak.svc.cluster.local/auth/realms/rewabank/protocol/openid-connect/certs"
   REDIS_HOST:           "valkey.banking.svc.cluster.local"
   REDIS_PORT:           "6379"
   ACCOUNTS_SERVICE_URL: "http://accounts-service.banking.svc.cluster.local:8081"
@@ -66,6 +66,13 @@ spec:
                 secretKeyRef:
                   name: loans-db-secret
                   key: password
+            - name: INTERNAL_CALL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: internal-call-secret
+                  key: secret
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms192m -Xmx384m -XX:+UseG1GC"
           resources:
             requests:
               memory: "256Mi"
@@ -73,18 +80,24 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8090
+            failureThreshold: 36
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8090
-            initialDelaySeconds: 60
+            initialDelaySeconds: 5
             periodSeconds: 30
             failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8090
-            initialDelaySeconds: 30
+            initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 3
 ---

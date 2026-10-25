@@ -9,12 +9,12 @@ spring:
     name: auth-ms
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/auth_db}
-    username: ${DB_USERNAME:auth_user}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
+      maximum-pool-size: 2
+      minimum-idle: 1
       connection-timeout: 30000
       idle-timeout: 600000
 
@@ -93,7 +93,7 @@ management:
         enabled: true
   tracing:
     sampling:
-      probability: 1.0
+      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
   otlp:
     tracing:
       endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
@@ -108,6 +108,8 @@ logging:
 
 springdoc:
   api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
     path: /v3/api-docs
   swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
     path: /swagger-ui.html

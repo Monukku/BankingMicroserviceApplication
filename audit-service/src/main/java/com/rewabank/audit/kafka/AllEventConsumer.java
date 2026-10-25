@@ -11,6 +11,7 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Consumes ALL bank.* topics — single consumer for all events.
@@ -27,7 +28,7 @@ public class AllEventConsumer {
 
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 2000, multiplier = 2),
+            backoff = @Backoff(delay = 2000, multiplier = 2, random = true),
             dltTopicSuffix = ".audit.dlq",
             retryTopicSuffix = ".audit.retry"
     )
@@ -59,15 +60,28 @@ public class AllEventConsumer {
                     "bank.card.issued",
                     "bank.card.blocked"
             },
-            groupId = "audit-ms"
+            groupId = "${kafka.consumer.group-id:audit-ms}"
     )
     public void consumeAll(
             Map<String, Object> event,
-            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset) {
         try {
             log.debug("Audit consuming from topic: {} eventType: {}",
                     topic, event.get("eventType"));
-            auditService.record(event, topic);
+
+            // If the event carries no eventId, inject a deterministic key from
+            // Kafka coordinates so existsByEventId() correctly deduplicates retries.
+            // UUID.randomUUID() as fallback generates a new ID on every retry,
+            // defeating the idempotency check in AuditService.
+            Map<String, Object> auditable = event;
+            if (!event.containsKey("eventId") || event.get("eventId") == null) {
+                auditable = new HashMap<>(event);
+                auditable.put("eventId", topic + "-" + partition + "-" + offset);
+            }
+
+            auditService.record(auditable, topic);
         } catch (Exception e) {
             log.error("Audit failed for topic: {} error: {} — will retry",
                     topic, e.getMessage());

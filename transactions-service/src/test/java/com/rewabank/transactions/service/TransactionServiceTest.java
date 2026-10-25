@@ -56,9 +56,9 @@ class TransactionServiceTest {
         destId   = UUID.randomUUID();
 
         request = new TransferRequest(
-                sourceId, destId, "222222222222",
+                sourceId, "111111111111", destId, "222222222222",
                 new BigDecimal("5000.00"),
-                Transaction.TransactionType.TRANSFER, "Rent payment", null);
+                "Rent payment", null);
 
         completedTxn = Transaction.builder()
                 .id(UUID.randomUUID())

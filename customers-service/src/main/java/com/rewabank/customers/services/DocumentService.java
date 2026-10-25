@@ -5,31 +5,34 @@ import com.rewabank.customers.entity.KycDocument;
 import com.rewabank.customers.exception.CustomerException;
 import com.rewabank.customers.repository.CustomerRepository;
 import com.rewabank.customers.repository.KycDocumentRepository;
-import io.minio.MinioClient;
-import io.minio.PutObjectArgs;
-import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class DocumentService {
 
-    private final MinioClient          minioClient;
+    private final S3Client              s3Client;
+    private final S3Presigner           s3Presigner;
     private final KycDocumentRepository documentRepository;
-    private final CustomerRepository   customerRepository;
+    private final CustomerRepository    customerRepository;
 
-    @Value("${minio.bucket-name:rewabank-kyc-docs}")
+    @Value("${s3.bucket-name:rewabank-kyc-docs}")
     private String bucketName;
 
     private static final long MAX_FILE_SIZE    = 5 * 1024 * 1024; // 5MB
@@ -44,7 +47,6 @@ public class DocumentService {
     public KycDocument uploadDocument(String keycloakUserId,
                                       KycDocument.DocumentType documentType,
                                       MultipartFile file) {
-        // Validate file
         if (file.isEmpty()) {
             throw new CustomerException("CUST_007", "File is empty");
         }
@@ -59,25 +61,24 @@ public class DocumentService {
                 .findByKeycloakUserIdAndDeletedAtIsNull(keycloakUserId)
                 .orElseThrow(() -> new CustomerException("CUST_001", "Customer not found"));
 
-        // Build MinIO object key — never expose customer ID directly in key
         String objectKey = buildObjectKey(customer.getId(), documentType, file.getOriginalFilename());
 
         try {
-            minioClient.putObject(
-                    PutObjectArgs.builder()
+            s3Client.putObject(
+                    PutObjectRequest.builder()
                             .bucket(bucketName)
-                            .object(objectKey)
-                            .stream(file.getInputStream(), file.getSize(), -1)
+                            .key(objectKey)
                             .contentType(file.getContentType())
-                            .build()
+                            .contentLength(file.getSize())
+                            .build(),
+                    RequestBody.fromInputStream(file.getInputStream(), file.getSize())
             );
-            log.info("Document uploaded to MinIO: {}", objectKey);
+            log.info("Document uploaded to S3: {}", objectKey);
         } catch (Exception e) {
-            log.error("MinIO upload failed: {}", e.getMessage());
+            log.error("S3 upload failed: {}", e.getMessage());
             throw new CustomerException("CUST_010", "Document upload failed");
         }
 
-        // Save document record
         KycDocument doc = KycDocument.builder()
                 .customerId(customer.getId())
                 .documentType(documentType)
@@ -97,14 +98,15 @@ public class DocumentService {
         log.info("KYC document access: documentId={} customerId={} requestedBy={}",
                 documentId, doc.getCustomerId(), requestedByUserId);
         try {
-            return minioClient.getPresignedObjectUrl(
-                    GetPresignedObjectUrlArgs.builder()
-                            .bucket(bucketName)
-                            .object(doc.getMinioObjectKey())
-                            .method(Method.GET)
-                            .expiry(15, TimeUnit.MINUTES)
+            return s3Presigner.presignGetObject(
+                    GetObjectPresignRequest.builder()
+                            .signatureDuration(Duration.ofMinutes(15))
+                            .getObjectRequest(GetObjectRequest.builder()
+                                    .bucket(bucketName)
+                                    .key(doc.getMinioObjectKey())
+                                    .build())
                             .build()
-            );
+            ).url().toString();
         } catch (Exception e) {
             log.error("Failed to generate presigned URL: {}", e.getMessage());
             throw new CustomerException("CUST_012", "Failed to generate document view URL");
@@ -116,14 +118,12 @@ public class DocumentService {
     }
 
     private String buildObjectKey(UUID customerId, KycDocument.DocumentType type, String fileName) {
-        // Strip path components to prevent traversal; only use the sanitized extension
         String safeName = fileName != null
                 ? java.nio.file.Paths.get(fileName).getFileName().toString()
                 : "upload";
         String ext = safeName.contains(".")
                 ? safeName.substring(safeName.lastIndexOf('.')).toLowerCase()
                 : ".bin";
-        // Whitelist extension — reject anything not in allowed list
         if (!ALLOWED_EXTENSIONS.contains(ext)) {
             throw new CustomerException("CUST_013",
                     "File extension not allowed. Allowed: " + ALLOWED_EXTENSIONS);

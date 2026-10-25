@@ -12,6 +12,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -31,12 +33,35 @@ public class CustomerController {
                 customerService.getByKeycloakUserId(jwt.getSubject()));
     }
 
+    // Update own address
+    @PatchMapping("/me")
+    @Operation(summary = "Update current customer's address")
+    public ResponseEntity<CustomerResponse> updateMyAddress(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(customerService.updateAddress(jwt.getSubject(), body));
+    }
+
     // Get by ID — staff only
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('TELLER','RELATIONSHIP_MANAGER','BRANCH_MANAGER','AUDITOR','SUPER_ADMIN')")
     @Operation(summary = "Get customer profile by ID — staff only")
     public ResponseEntity<CustomerResponse> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(customerService.getById(id));
+    }
+
+    // Search by email or name — staff only
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('TELLER','RELATIONSHIP_MANAGER','BRANCH_MANAGER','AUDITOR','SUPER_ADMIN')")
+    @Operation(summary = "Search customers by email or name — staff only")
+    public ResponseEntity<List<CustomerResponse>> search(
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String name) {
+        if (email != null && !email.isBlank())
+            return ResponseEntity.ok(customerService.searchByEmail(email.trim()));
+        if (name != null && !name.isBlank())
+            return ResponseEntity.ok(customerService.searchByName(name.trim()));
+        return ResponseEntity.ok(List.of());
     }
 
     // KYC gate — called by Accounts MS internally (mTLS verified by Istio)

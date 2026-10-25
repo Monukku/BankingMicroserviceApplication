@@ -44,6 +44,8 @@ public class SecurityConfig {
                         .pathMatchers("/actuator/health/**", "/actuator/health", "/actuator/info").permitAll()
                         .pathMatchers("/api/v1/auth/register", "/api/v1/auth/login").permitAll()
                         .pathMatchers("/fallback/**").permitAll()
+                        // Razorpay calls this directly — no JWT, verified by HMAC inside payments-service
+                        .pathMatchers("/api/v1/payments/webhook/**").permitAll()
 
                         // â”€â”€ Role-based access â”€â”€ â† CHANGED: /rewabank/ â†’ /api/v1/
                         .pathMatchers("/api/v1/accounts/**").hasAnyRole(
@@ -106,7 +108,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(List.of(corsOriginWeb, corsOriginMobile));
         config.setAllowedHeaders(List.of(
                 "Authorization", "Content-Type", "X-Correlation-Id",
-                "X-Idempotency-Key", "X-Device-Id", "X-User-Id"));
+                "X-Idempotency-Key", "X-Device-Id", "X-User-Id", "X-Customer-Id"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setMaxAge(3600L);
 

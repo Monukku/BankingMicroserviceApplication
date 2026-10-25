@@ -25,6 +25,10 @@ public class KeycloakUserService {
     private String realm;
 
     public String createUser(RegisterRequest request) {
+        return createUser(request, true);
+    }
+
+    public String createUser(RegisterRequest request, boolean enabled) {
         UsersResource usersResource = keycloak.realm(realm).users();
 
         // Check if user already exists in Keycloak
@@ -34,7 +38,7 @@ public class KeycloakUserService {
         }
 
         UserRepresentation user = new UserRepresentation();
-        user.setEnabled(true);
+        user.setEnabled(enabled);
         user.setEmailVerified(false);
         user.setEmail(request.email());
         user.setUsername(request.email());
@@ -95,7 +99,7 @@ public class KeycloakUserService {
         log.info("Role {} assigned to user {}", roleName, keycloakUserId);
     }
 
-    private void deleteUser(String keycloakUserId) {
+    public void deleteUser(String keycloakUserId) {
         try {
             keycloak.realm(realm).users().get(keycloakUserId).remove();
             log.info("Orphan user deleted from Keycloak: {}", keycloakUserId);
@@ -103,6 +107,16 @@ public class KeycloakUserService {
             log.error("CRITICAL: Failed to delete orphan Keycloak user {} — manual cleanup required: {}",
                     keycloakUserId, e.getMessage());
         }
+    }
+
+    public void enableUser(String keycloakUserId) {
+        UserRepresentation user = keycloak.realm(realm)
+                .users()
+                .get(keycloakUserId)
+                .toRepresentation();
+        user.setEnabled(true);
+        keycloak.realm(realm).users().get(keycloakUserId).update(user);
+        log.info("User enabled in Keycloak: {}", keycloakUserId);
     }
 
     public void lockUser(String keycloakUserId) {

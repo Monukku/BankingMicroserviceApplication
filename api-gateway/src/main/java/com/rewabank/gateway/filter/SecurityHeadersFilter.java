@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-@Order(3)
+@Order(5)
 @Component
 public class SecurityHeadersFilter implements GlobalFilter {
 

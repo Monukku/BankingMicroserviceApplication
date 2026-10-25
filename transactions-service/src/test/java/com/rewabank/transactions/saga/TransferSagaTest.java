@@ -63,9 +63,9 @@ class TransferSagaTest {
                 .build();
 
         request = new TransferRequest(
-                sourceId, destId, "222222222222",
+                sourceId, "111111111111", destId, "222222222222",
                 new BigDecimal("5000.00"),
-                Transaction.TransactionType.TRANSFER, "Test transfer", null);
+                "Test transfer", null);
 
         when(transactionRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(ledgerEntryRepository.save(any())).thenAnswer(i -> i.getArgument(0));

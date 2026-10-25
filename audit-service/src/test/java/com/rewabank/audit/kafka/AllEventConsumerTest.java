@@ -6,9 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.util.Map;
-
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
@@ -26,14 +24,14 @@ class AllEventConsumerTest {
 
     @Test
     void consumeAll_success_delegatesToAuditServiceWithTopic() {
-        consumer.consumeAll(EVENT, "bank.account.activated");
+        consumer.consumeAll(EVENT, "bank.account.activated", 0, 1L);
 
         verify(auditService).record(EVENT, "bank.account.activated");
     }
 
     @Test
     void consumeAll_differentTopic_passesCorrectTopic() {
-        consumer.consumeAll(EVENT, "bank.transaction.completed");
+        consumer.consumeAll(EVENT, "bank.transaction.completed", 0, 2L);
 
         verify(auditService).record(EVENT, "bank.transaction.completed");
     }
@@ -43,8 +41,19 @@ class AllEventConsumerTest {
         doThrow(new RuntimeException("DB down"))
                 .when(auditService).record(any(), any());
 
-        assertThatThrownBy(() -> consumer.consumeAll(EVENT, "bank.account.activated"))
+        assertThatThrownBy(() -> consumer.consumeAll(EVENT, "bank.account.activated", 0, 1L))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("DB down");
+    }
+
+    @Test
+    void consumeAll_missingEventId_injectsKafkaCoordinateKey() {
+        Map<String, Object> noId = Map.of("eventType", "ACCOUNT_CREATED");
+
+        consumer.consumeAll(noId, "bank.account.created", 1, 42L);
+
+        verify(auditService).record(argThat(e ->
+                "bank.account.created-1-42".equals(e.get("eventId"))
+        ), eq("bank.account.created"));
     }
 }

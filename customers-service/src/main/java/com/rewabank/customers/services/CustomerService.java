@@ -2,9 +2,13 @@ package com.rewabank.customers.services;
 
 import com.rewabank.customers.dto.CustomerResponse;
 import com.rewabank.customers.dto.KycStatusResponse;
+import com.rewabank.customers.entity.Address;
 import com.rewabank.customers.entity.Customer;
 import com.rewabank.customers.exception.CustomerException;
+import com.rewabank.customers.repository.AddressRepository;
 import com.rewabank.customers.repository.CustomerRepository;
+import com.rewabank.customers.repository.KycDocumentRepository;
+import com.rewabank.customers.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -12,6 +16,10 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.rewabank.customers.entity.KycDocument;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -21,7 +29,10 @@ public class CustomerService {
 
     private static final String ERR_CODE_NOT_FOUND = "CUST_001";
     private static final String ERR_CUSTOMER_NOT_FOUND = "Customer not found";
-    private final CustomerRepository customerRepository;
+    private final CustomerRepository    customerRepository;
+    private final AddressRepository     addressRepository;
+    private final KycDocumentRepository kycDocumentRepository;
+    private final EncryptionUtil        encryptionUtil;
 
     @Transactional(readOnly = true)
     public CustomerResponse getByKeycloakUserId(String keycloakUserId) {
@@ -52,8 +63,47 @@ public class CustomerService {
                 customer.getKeycloakUserId(),
                 customer.getKycStatus(),
                 customer.isKycVerified(),
-                kycStatusMessage(customer.getKycStatus())
+                kycStatusMessage(customer.getKycStatus()),
+                customer.getFullName(),
+                customer.getEmail(),
+                customer.getMobileNumber()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<CustomerResponse> searchByEmail(String email) {
+        return customerRepository.findByEmailContainingIgnoreCaseAndDeletedAtIsNull(email)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CustomerResponse> searchByName(String name) {
+        String pattern = "%" + name.toLowerCase() + "%";
+        return customerRepository.searchByName(pattern)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Transactional
+    public CustomerResponse updateAddress(String keycloakUserId, Map<String, String> body) {
+        Customer customer = customerRepository
+                .findByKeycloakUserIdAndDeletedAtIsNull(keycloakUserId)
+                .orElseThrow(() -> new CustomerException(ERR_CODE_NOT_FOUND, ERR_CUSTOMER_NOT_FOUND));
+
+        Address address = customer.getAddress();
+        if (address == null) {
+            address = Address.builder().customer(customer).build();
+        }
+        if (body.containsKey("addressLine1")) address.setAddressLine1(body.get("addressLine1"));
+        if (body.containsKey("addressLine2")) address.setAddressLine2(body.get("addressLine2"));
+        if (body.containsKey("city"))         address.setCity(body.get("city"));
+        if (body.containsKey("state"))        address.setState(body.get("state"));
+        if (body.containsKey("pincode"))      address.setPincode(body.get("pincode"));
+        if (body.containsKey("country"))      address.setCountry(body.get("country"));
+        addressRepository.save(address);
+        customer.setAddress(address);
+
+        log.info("Address updated for customer {}", keycloakUserId);
+        return toResponse(customer);
     }
 
     @CacheEvict(value = "kyc-status", key = "#customerId")
@@ -62,6 +112,42 @@ public class CustomerService {
     }
 
     private CustomerResponse toResponse(Customer c) {
+        CustomerResponse.AddressSummary addressSummary = null;
+        if (c.getAddress() != null) {
+            Address a = c.getAddress();
+            addressSummary = new CustomerResponse.AddressSummary(
+                    a.getAddressLine1(), a.getAddressLine2(),
+                    a.getCity(), a.getState(), a.getPincode(), a.getCountry()
+            );
+        }
+
+        // Deduplicate: latest upload per document type only
+        List<CustomerResponse.DocumentSummary> documents = kycDocumentRepository
+                .findByCustomerIdOrderByCreatedAtDesc(c.getId())
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        KycDocument::getDocumentType,
+                        d -> d,
+                        (existing, replacement) -> existing)) // first = latest (already sorted desc)
+                .values().stream()
+                .sorted(Comparator.comparing(d -> d.getDocumentType().name()))
+                .map(d -> new CustomerResponse.DocumentSummary(d.getId(), d.getDocumentType(), d.getStatus()))
+                .toList();
+
+        // Decrypt and mask Aadhaar/PAN — never return plaintext
+        String maskedAadhaar = null;
+        String maskedPan = null;
+        try {
+            if (c.getAadhaarNumberEncrypted() != null)
+                maskedAadhaar = encryptionUtil.maskAadhaar(
+                        encryptionUtil.decrypt(c.getAadhaarNumberEncrypted()));
+            if (c.getPanNumberEncrypted() != null)
+                maskedPan = encryptionUtil.maskPan(
+                        encryptionUtil.decrypt(c.getPanNumberEncrypted()));
+        } catch (Exception e) {
+            log.warn("Could not mask Aadhaar/PAN for customer {}: {}", c.getId(), e.getMessage());
+        }
+
         return new CustomerResponse(
                 c.getId(),
                 c.getKeycloakUserId(),
@@ -72,7 +158,12 @@ public class CustomerService {
                 c.getKycStatus(),
                 c.getKycSubmittedAt(),
                 c.getKycVerifiedAt(),
-                c.getCreatedAt()
+                c.getCreatedAt(),
+                addressSummary,
+                documents,
+                maskedAadhaar,
+                maskedPan,
+                c.getKycRejectionReason()
         );
     }
 

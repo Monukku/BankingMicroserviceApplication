@@ -1,7 +1,7 @@
 package com.rewabank.transactions.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rewabank.transactions.client.AccountsFeignClient;
+import com.rewabank.transactions.dto.AccountInfoResponse;
 import com.rewabank.transactions.dto.TransferRequest;
 import com.rewabank.transactions.dto.TransactionResponse;
 import com.rewabank.transactions.entity.Transaction;
@@ -30,6 +30,7 @@ public class TransactionService {
     private final IdempotencyService    idempotencyService;
     private final LimitService          limitService;
     private final TransferSaga          transferSaga;
+    private final AccountsFeignClient   accountsClient;
 
     @Transactional
     public TransactionResponse transfer(String keycloakUserId,
@@ -49,6 +50,28 @@ public class TransactionService {
         idempotencyService.markInProgress(idempotencyKey);
 
         try {
+            // ── Verify source account ownership ───────────────────────────────
+            // Prevents a user from debiting another user's account by guessing UUIDs
+            AccountInfoResponse sourceAccount = accountsClient.getById(request.sourceAccountId());
+            if (!keycloakUserId.equals(sourceAccount.keycloakUserId())) {
+                throw new TransactionException("TXN_010",
+                        "Source account does not belong to the requesting user");
+            }
+            if (!"ACTIVE".equals(sourceAccount.status())) {
+                throw new TransactionException("TXN_011",
+                        "Source account is not active");
+            }
+
+            // ── Resolve destination account ID from account number ────────────
+            // Client sends only the account number; backend looks up the UUID
+            AccountInfoResponse destAccount =
+                    accountsClient.lookupByAccountNumber(request.destinationAccountNumber());
+            if (!"ACTIVE".equals(destAccount.status())) {
+                throw new TransactionException("TXN_012",
+                        "Destination account is not active");
+            }
+            UUID destinationAccountId = destAccount.id();
+
             // ── Beneficiary cooling period check ─────────────────────────────
             beneficiaryRepository
                     .findByKeycloakUserIdAndBeneficiaryAccountNumberAndDeletedAtIsNull(
@@ -71,11 +94,11 @@ public class TransactionService {
                     .idempotencyKey(idempotencyKey)
                     .keycloakUserId(keycloakUserId)
                     .sourceAccountId(request.sourceAccountId())
-                    .destinationAccountId(request.destinationAccountId())
-                    .sourceAccountNumber("")  // populated by Accounts MS response
+                    .destinationAccountId(destinationAccountId)
+                    .sourceAccountNumber(request.sourceAccountNumber())
                     .destinationAccountNumber(request.destinationAccountNumber())
                     .amount(request.amount())
-                    .transactionType(request.transactionType())
+                    .transactionType(Transaction.TransactionType.TRANSFER)
                     .remarks(request.remarks())
                     .ipAddress(ipAddress)
                     .deviceId(request.deviceId())
@@ -134,6 +157,13 @@ public class TransactionService {
             String keycloakUserId, Pageable pageable) {
         return transactionRepository
                 .findByKeycloakUserIdOrderByCreatedAtDesc(keycloakUserId, pageable)
+                .map(this::toResponse);
+    }
+
+    @PreAuthorize("hasAnyRole('BRANCH_MANAGER','SUPER_ADMIN')")
+    @Transactional(readOnly = true)
+    public Page<TransactionResponse> getAllTransactions(Pageable pageable) {
+        return transactionRepository.findAllByOrderByCreatedAtDesc(pageable)
                 .map(this::toResponse);
     }
 

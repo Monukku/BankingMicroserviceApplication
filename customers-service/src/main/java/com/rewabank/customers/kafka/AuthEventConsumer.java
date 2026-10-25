@@ -22,7 +22,7 @@ public class AuthEventConsumer {
     // 3-tier DLQ: bank.user.registered → bank.user.registered.retry → bank.user.registered.dlq
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 1000, multiplier = 2),
+            backoff = @Backoff(delay = 1000, multiplier = 2, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
@@ -39,8 +39,10 @@ public class AuthEventConsumer {
 
         log.info("Received USER_REGISTERED event for: {}", email);
 
-        // Idempotent — skip if profile already exists
-        if (customerRepository.existsByKeycloakUserIdAndDeletedAtIsNull(keycloakUserId)) {
+        // Idempotent — skip if ANY profile (including soft-deleted) already exists.
+        // existsByKeycloakUserIdAndDeletedAtIsNull() would miss soft-deleted records,
+        // causing a duplicate customer row for the same Keycloak identity on re-register.
+        if (customerRepository.existsByKeycloakUserId(keycloakUserId)) {
             log.warn("Customer profile already exists for keycloakUserId: {} — skipping", keycloakUserId);
             return;
         }

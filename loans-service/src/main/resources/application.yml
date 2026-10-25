@@ -19,8 +19,8 @@ spring:
     username: ${DB_USERNAME:loans_user}
     password: ${DB_PASSWORD}
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: 10
+      minimum-idle: 2
       connection-timeout: 30000
       keepalive-time: 30000
 
@@ -56,10 +56,16 @@ spring:
     openfeign:
       circuitbreaker:
         enabled: true
+      okhttp:
+        enabled: true
 
 accounts:
   service:
     url: ${ACCOUNTS_SERVICE_URL:http://accounts-service.banking.svc.cluster.local:8081}
+
+internal:
+  call:
+    secret: ${INTERNAL_CALL_SECRET}
 
 customers:
   service:
@@ -112,10 +118,9 @@ management:
     export:
       prometheus:
         enabled: true
-  # ADDED: OTel tracing
   tracing:
     sampling:
-      probability: 1.0
+      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
   otlp:
     tracing:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
@@ -127,3 +132,8 @@ logging:
   pattern:
     level: "%5p[${spring.application.name},%X{traceId},%X{spanId}]"
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}

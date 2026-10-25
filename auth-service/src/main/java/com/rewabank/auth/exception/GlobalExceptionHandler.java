@@ -8,7 +8,6 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
-
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -18,8 +17,7 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(AuthException.class)
-    public ResponseEntity<Map<String, Object>> handleAuthException(
-            AuthException ex, WebRequest request) {
+    public ResponseEntity<Map<String, Object>> handleAuthException(AuthException ex, WebRequest request) {
 
         HttpStatus status = switch (ex.getErrorCode()) {
             case "AUTH_001" -> HttpStatus.CONFLICT;

@@ -1,8 +1,12 @@
 package com.rewabank.customers.controller;
 
+import com.rewabank.customers.dto.CustomerResponse;
 import com.rewabank.customers.dto.KycSubmitRequest;
 import com.rewabank.customers.dto.KycVerifyRequest;
+import com.rewabank.customers.entity.Customer;
 import com.rewabank.customers.entity.KycDocument;
+import com.rewabank.customers.repository.CustomerRepository;
+import com.rewabank.customers.services.CustomerService;
 import com.rewabank.customers.services.DocumentService;
 import com.rewabank.customers.services.KycService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +20,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -27,6 +32,22 @@ public class KycController {
 
     private final KycService kycService;
     private final DocumentService documentService;
+    private final CustomerRepository customerRepository;
+    private final CustomerService customerService;
+
+    // Staff: get all customers with pending/under-review KYC
+    @GetMapping("/pending")
+    @PreAuthorize("hasAnyRole('RELATIONSHIP_MANAGER','BRANCH_MANAGER','SUPER_ADMIN')")
+    @Operation(summary = "Get all customers with pending KYC — staff only")
+    public ResponseEntity<List<CustomerResponse>> getPendingKyc() {
+        List<CustomerResponse> pending = customerRepository
+                .findByKycStatusInAndDeletedAtIsNull(
+                        List.of(Customer.KycStatus.SUBMITTED, Customer.KycStatus.UNDER_REVIEW))
+                .stream()
+                .map(c -> customerService.getById(c.getId()))
+                .toList();
+        return ResponseEntity.ok(pending);
+    }
 
     // Customer submits KYC details
     @PostMapping("/submit")

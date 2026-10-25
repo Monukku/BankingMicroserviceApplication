@@ -4,7 +4,6 @@ import com.rewabank.accounts.dto.KycStatusResponse;
 import com.rewabank.accounts.exception.AccountException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
 import java.util.UUID;
 
 @Component

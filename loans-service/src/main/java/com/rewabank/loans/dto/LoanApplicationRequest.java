@@ -15,7 +15,7 @@ public record LoanApplicationRequest(
 
         @NotNull(message = "Amount is required")
         @DecimalMin(value = "10000.00", message = "Minimum loan amount is Rs 10,000")
-        @DecimalMax(value = "5000000.00", message = "Maximum loan amount is Rs 50,00,000")
+        @DecimalMax(value = "20000000.00", message = "Maximum loan amount is Rs 2,00,00,000")
         BigDecimal requestedAmount,
 
         @NotNull(message = "Tenure is required")

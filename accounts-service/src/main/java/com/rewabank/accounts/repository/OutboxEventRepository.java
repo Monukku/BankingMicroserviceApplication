@@ -23,4 +23,12 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> 
         LIMIT 50
         """)
     List<OutboxEvent> findPendingEvents(@Param("now") LocalDateTime now);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM OutboxEvent o WHERE o.status = 'PUBLISHED' AND o.processedAt < :before")
+    int deletePublished(@Param("before") LocalDateTime before);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM OutboxEvent o WHERE o.status = 'FAILED' AND o.createdAt < :before")
+    int deleteFailed(@Param("before") LocalDateTime before);
 }

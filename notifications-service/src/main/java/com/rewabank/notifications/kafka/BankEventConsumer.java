@@ -27,7 +27,7 @@ public class BankEventConsumer {
     // Account events
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 1000, multiplier = 2),
+            backoff = @Backoff(delay = 1000, multiplier = 2, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
@@ -39,7 +39,7 @@ public class BankEventConsumer {
                     "bank.account.closed",
                     "bank.account.dormant"
             },
-            groupId = "notifications-ms-accounts"
+            groupId = "${kafka.consumer.groups.accounts:notifications-ms-accounts}"
     )
     public void handleAccountEvents(Map<String, Object> event,
                                     Acknowledgment ack) {
@@ -49,7 +49,7 @@ public class BankEventConsumer {
     // Transaction events
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 1000, multiplier = 2),
+            backoff = @Backoff(delay = 1000, multiplier = 2, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
@@ -59,7 +59,7 @@ public class BankEventConsumer {
                     "bank.transaction.failed",
                     "bank.transaction.reversed"
             },
-            groupId = "notifications-ms-transactions"
+            groupId = "${kafka.consumer.groups.transactions:notifications-ms-transactions}"
     )
     public void handleTransactionEvents(Map<String, Object> event,
                                         Acknowledgment ack) {
@@ -69,13 +69,13 @@ public class BankEventConsumer {
     // Balance events — low balance alert
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 2000, multiplier = 2),
+            backoff = @Backoff(delay = 2000, multiplier = 2, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
     @KafkaListener(
             topics = "bank.balance.updated",
-            groupId = "notifications-ms-balance"
+            groupId = "${kafka.consumer.groups.balance:notifications-ms-balance}"
     )
     public void handleBalanceEvents(Map<String, Object> event,
                                     Acknowledgment ack) {
@@ -85,7 +85,7 @@ public class BankEventConsumer {
     // Fraud events
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 500),
+            backoff = @Backoff(delay = 500, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
@@ -94,7 +94,7 @@ public class BankEventConsumer {
                     "bank.fraud.alert.raised",
                     "bank.fraud.alert.cleared"
             },
-            groupId = "notifications-ms-fraud"
+            groupId = "${kafka.consumer.groups.fraud:notifications-ms-fraud}"
     )
     public void handleFraudEvents(Map<String, Object> event,
                                   Acknowledgment ack) {
@@ -104,7 +104,7 @@ public class BankEventConsumer {
     // Loan events
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 1000, multiplier = 2),
+            backoff = @Backoff(delay = 1000, multiplier = 2, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
@@ -116,7 +116,7 @@ public class BankEventConsumer {
                     "bank.repayment.completed",
                     "bank.repayment.overdue"
             },
-            groupId = "notifications-ms-loans"
+            groupId = "${kafka.consumer.groups.loans:notifications-ms-loans}"
     )
     public void handleLoanEvents(Map<String, Object> event,
                                  Acknowledgment ack) {
@@ -126,7 +126,7 @@ public class BankEventConsumer {
     // Payment events
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 1000, multiplier = 2),
+            backoff = @Backoff(delay = 1000, multiplier = 2, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
@@ -135,7 +135,7 @@ public class BankEventConsumer {
                     "bank.payment.success",
                     "bank.payment.failed"
             },
-            groupId = "notifications-ms-payments"
+            groupId = "${kafka.consumer.groups.payments:notifications-ms-payments}"
     )
     public void handlePaymentEvents(Map<String, Object> event,
                                     Acknowledgment ack) {
@@ -145,7 +145,7 @@ public class BankEventConsumer {
     // Card events
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 1000, multiplier = 2),
+            backoff = @Backoff(delay = 1000, multiplier = 2, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
@@ -154,7 +154,7 @@ public class BankEventConsumer {
                     "bank.card.issued",
                     "bank.card.blocked"
             },
-            groupId = "notifications-ms-cards"
+            groupId = "${kafka.consumer.groups.cards:notifications-ms-cards}"
     )
     public void handleCardEvents(Map<String, Object> event,
                                  Acknowledgment ack) {
@@ -164,7 +164,7 @@ public class BankEventConsumer {
     // User events
     @RetryableTopic(
             attempts = "3",
-            backoff = @Backoff(delay = 1000, multiplier = 2),
+            backoff = @Backoff(delay = 1000, multiplier = 2, random = true),
             dltTopicSuffix = ".dlq",
             retryTopicSuffix = ".retry"
     )
@@ -174,7 +174,7 @@ public class BankEventConsumer {
                     "bank.user.locked",
                     "bank.kyc.verified"
             },
-            groupId = "notifications-ms-users"
+            groupId = "${kafka.consumer.groups.users:notifications-ms-users}"
     )
     public void handleUserEvents(Map<String, Object> event,
                                  Acknowledgment ack) {

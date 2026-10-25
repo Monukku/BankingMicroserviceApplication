@@ -51,6 +51,32 @@ public class CardEventProducer {
         ));
     }
 
+    public void publishCardActivated(String cardId, String userId,
+                                     String accountId, String lastFour) {
+        publish(cardIssuedTopic, cardId, Map.of(
+                "eventId",   UUID.randomUUID().toString(),
+                "eventType", "CARD_ACTIVATED",
+                "cardId",    cardId,
+                "userId",    userId,
+                "accountId", accountId,
+                "lastFour",  lastFour,
+                "occurredAt",LocalDateTime.now().toString()
+        ));
+    }
+
+    public void publishCardCancelled(String cardId, String userId,
+                                     String accountId, String reason) {
+        publish(cardBlockedTopic, cardId, Map.of(
+                "eventId",   UUID.randomUUID().toString(),
+                "eventType", "CARD_CANCELLED",
+                "cardId",    cardId,
+                "userId",    userId != null ? userId : "",
+                "accountId", accountId,
+                "reason",    reason != null ? reason : "",
+                "occurredAt",LocalDateTime.now().toString()
+        ));
+    }
+
     private void publish(String topic, String key,
                          Map<String, Object> payload) {
         kafkaTemplate.send(topic, key, payload)

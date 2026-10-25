@@ -18,15 +18,21 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(TransactionException.class)
-    public ResponseEntity<Map<String, Object>> handleTransaction(
-            TransactionException ex, WebRequest request) {
+    public ResponseEntity<Map<String, Object>> handleTransaction(TransactionException ex, WebRequest request) {
 
         HttpStatus status = switch (ex.getErrorCode()) {
             case "TXN_007"      -> HttpStatus.NOT_FOUND;
+            case "TXN_ACCT_005" -> HttpStatus.NOT_FOUND;
             case "TXN_001"      -> HttpStatus.CONFLICT;
-            case "TXN_FRAUD_001"-> HttpStatus.FORBIDDEN;
+            case "TXN_FRAUD_001",
+                 "TXN_010"      -> HttpStatus.FORBIDDEN;
             case "TXN_ACCT_001",
-                 "TXN_ACCT_002" -> HttpStatus.SERVICE_UNAVAILABLE;
+                 "TXN_ACCT_002",
+                 "TXN_ACCT_003",
+                 "TXN_ACCT_004",
+                 "TXN_ACCT_006" -> HttpStatus.SERVICE_UNAVAILABLE;
+            case "TXN_011",
+                 "TXN_012"      -> HttpStatus.UNPROCESSABLE_ENTITY;
             default             -> HttpStatus.BAD_REQUEST;
         };
 

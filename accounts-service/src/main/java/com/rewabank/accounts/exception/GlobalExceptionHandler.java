@@ -30,16 +30,16 @@ public class GlobalExceptionHandler {
             AccountException ex, WebRequest request) {
 
         HttpStatus status = switch (ex.getErrorCode()) {
-            case "ACCT_002"     -> HttpStatus.NOT_FOUND;
-            case "ACCT_001",
-                 "ACCT_003",
-                 "ACCT_004",
-                 "ACCT_005",
-                 "ACCT_006",
-                 "ACCT_007",
-                 "ACCT_008"    -> HttpStatus.BAD_REQUEST;
-            case "ACCT_KYC_001" -> HttpStatus.SERVICE_UNAVAILABLE;
-            default             -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case "ACCT_002"                             -> HttpStatus.NOT_FOUND;
+            case "ACCT_001", "ACCT_003", "ACCT_004",
+                 "ACCT_005",  "ACCT_006", "ACCT_007",
+                 "ACCT_008",  "ACCT_009",
+                 "ACCT_FD_001", "ACCT_FD_002", "ACCT_FD_003",
+                 "ACCT_FD_004", "ACCT_FD_005",
+                 "ACCT_RD_001", "ACCT_RD_002", "ACCT_RD_003",
+                 "ACCT_SAL_001", "ACCT_SAL_002"         -> HttpStatus.BAD_REQUEST;
+            case "ACCT_KYC_001"                         -> HttpStatus.SERVICE_UNAVAILABLE;
+            default                                     -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
 
         log.warn("AccountException [{}]: {}", ex.getErrorCode(), ex.getMessage());

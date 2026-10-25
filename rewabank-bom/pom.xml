@@ -30,6 +30,7 @@
 		<testcontainers.version>1.19.8</testcontainers.version>
 		<jjwt.version>0.12.3</jjwt.version>
 		<guava.version>33.4.0-jre</guava.version>
+		<bucket4j.version>8.14.0</bucket4j.version>
 		<sonar.organization>monukku</sonar.organization>
         <sonar.projectKey>Monukku_BankingMicroserviceApplication</sonar.projectKey>
 		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
@@ -114,6 +115,18 @@
 				<groupId>com.google.guava</groupId>
 				<artifactId>guava</artifactId>
 				<version>${guava.version}</version>
+			</dependency>
+
+			<!-- Bucket4j — distributed rate limiting (JDK17+ variant) -->
+			<dependency>
+				<groupId>com.bucket4j</groupId>
+				<artifactId>bucket4j_jdk17-core</artifactId>
+				<version>${bucket4j.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.bucket4j</groupId>
+				<artifactId>bucket4j_jdk17-lettuce</artifactId>
+				<version>${bucket4j.version}</version>
 			</dependency>
 
 		</dependencies>

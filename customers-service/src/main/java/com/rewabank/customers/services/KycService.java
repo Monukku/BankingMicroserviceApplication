@@ -5,10 +5,12 @@ import com.rewabank.customers.dto.KycSubmitRequest;
 import com.rewabank.customers.dto.KycVerifyRequest;
 import com.rewabank.customers.entity.Address;
 import com.rewabank.customers.entity.Customer;
+import com.rewabank.customers.entity.KycDocument;
 import com.rewabank.customers.exception.CustomerException;
 import com.rewabank.customers.kafka.CustomerEventProducer;
 import com.rewabank.customers.repository.AddressRepository;
 import com.rewabank.customers.repository.CustomerRepository;
+import com.rewabank.customers.repository.KycDocumentRepository;
 import com.rewabank.customers.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,11 +26,12 @@ import java.util.UUID;
 @Slf4j
 public class KycService {
 
-    private final CustomerRepository  customerRepository;
-    private final AddressRepository   addressRepository;
-    private final CustomerService     customerService;
+    private final CustomerRepository    customerRepository;
+    private final AddressRepository     addressRepository;
+    private final CustomerService       customerService;
     private final CustomerEventProducer eventProducer;
-    private final EncryptionUtil      encryptionUtil;
+    private final EncryptionUtil        encryptionUtil;
+    private final KycDocumentRepository kycDocumentRepository;
 
     // Customer submits KYC details + documents
     @Transactional
@@ -44,6 +47,18 @@ public class KycService {
         if (customer.getKycStatus() == Customer.KycStatus.UNDER_REVIEW ||
                 customer.getKycStatus() == Customer.KycStatus.SUBMITTED) {
             throw new CustomerException("CUST_003", "KYC already submitted and under review");
+        }
+
+        // Require minimum documents before submission
+        if (!kycDocumentRepository.existsByCustomerIdAndDocumentType(
+                customer.getId(), KycDocument.DocumentType.AADHAAR_FRONT)) {
+            throw new CustomerException("CUST_014",
+                    "Aadhaar front document must be uploaded before submitting KYC");
+        }
+        if (!kycDocumentRepository.existsByCustomerIdAndDocumentType(
+                customer.getId(), KycDocument.DocumentType.PAN_CARD)) {
+            throw new CustomerException("CUST_015",
+                    "PAN card document must be uploaded before submitting KYC");
         }
 
         // Encrypt sensitive fields before saving

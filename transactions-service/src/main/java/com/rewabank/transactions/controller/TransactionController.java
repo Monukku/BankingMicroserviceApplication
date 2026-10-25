@@ -72,6 +72,15 @@ public class TransactionController {
                 transactionService.getById(id, jwt.getSubject()));
     }
 
+    // Get all transactions — staff only (BRANCH_MANAGER, SUPER_ADMIN)
+    @GetMapping("/all")
+    @PreAuthorize("hasAnyRole('BRANCH_MANAGER','SUPER_ADMIN')")
+    @Operation(summary = "Get all transactions — staff only")
+    public ResponseEntity<Page<TransactionResponse>> getAllTransactions(
+            @PageableDefault(size = 50, sort = "createdAt") Pageable pageable) {
+        return ResponseEntity.ok(transactionService.getAllTransactions(pageable));
+    }
+
     // Manual reversal — Branch Manager only
     @PostMapping("/{id}/reverse")
     @PreAuthorize("hasAnyRole('BRANCH_MANAGER','SUPER_ADMIN')")

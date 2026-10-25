@@ -1,5 +1,6 @@
 package com.rewabank.accounts.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -11,6 +12,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 import java.util.Collection;
 import java.util.List;
@@ -21,6 +23,9 @@ import java.util.stream.Collectors;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    @Value("${internal.call.secret}")
+    private String internalCallSecret;
 
     private static final String ROLE_CUSTOMER             = "CUSTOMER";
     private static final String ROLE_TELLER               = "TELLER";
@@ -52,6 +57,9 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                        // Internal MS-to-MS GET by ID — network-level protected by Istio AuthorizationPolicy (cards-ms-sa)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/accounts/{id:[0-9a-f-]{36}}")
+                        .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/accounts")
                         .hasAnyRole(ROLE_CUSTOMER, ROLE_TELLER, ROLE_BRANCH_MANAGER, ROLE_SUPER_ADMIN)
                         .requestMatchers(HttpMethod.GET, "/api/v1/accounts/**")
@@ -62,15 +70,16 @@ public class SecurityConfig {
                         .hasAnyRole(ROLE_BRANCH_MANAGER, ROLE_SUPER_ADMIN)
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/accounts/*/close")
                         .hasAnyRole(ROLE_BRANCH_MANAGER, ROLE_SUPER_ADMIN)
-                        // Internal MS-to-MS endpoints — Istio AuthorizationPolicy restricts to transactions-ms-sa + loans-ms-sa
+                        // Internal MS-to-MS: valid JWT required + InternalCallFilter checks X-Internal-Call header
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/accounts/*/debit",
                                 "/api/v1/accounts/*/credit")
-                        .permitAll()
+                        .authenticated()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(
                                 jwtAuthenticationConverter())))
+                .addFilterBefore(new InternalCallFilter(internalCallSecret), AuthorizationFilter.class)
                 .csrf(csrf -> csrf.disable());
         return http.build();
     }
