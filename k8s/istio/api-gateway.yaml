@@ -73,7 +73,7 @@ spec:
     - match:
         - uri:
             prefix: /api/v1/kyc
-      timeout: 60s
+      timeout: 18s
       retries:
         attempts: 0
       route:
@@ -89,7 +89,10 @@ spec:
             host: api-gateway-service.banking.svc.cluster.local
             port:
               number: 8072
-      timeout: 30s
+      # Ingress (outer) sits above httpclient (16s) and the largest per-route time-limiter
+      # (auth 15s), so the gateway always fails first with its per-route fallback. Was 30s
+      # (loose). See RESILIENCE-TIMEOUT-RETRY-AUDIT.md.
+      timeout: 18s
       # retries owned by the per-service backend VirtualServices (one retry layer only).
       # The old attempts:2 here nested over the backend VS retry (e.g. accounts 2x),
       # multiplying load on a sick service, and retried gateway-error 503s (incl. the
