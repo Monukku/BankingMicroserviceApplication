@@ -4,6 +4,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
@@ -38,6 +39,19 @@ class CircuitBreakerConfigTest {
 
     @Autowired CircuitBreakerRegistry circuitBreakerRegistry;
     @Autowired TimeLimiterRegistry    timeLimiterRegistry;
+
+    @Value("${spring.cloud.gateway.httpclient.response-timeout}")
+    Duration httpClientResponseTimeout;
+
+    @Test
+    void httpClientBackstop_isAtLeastEveryPerRouteTimeLimiter() {
+        // Gateway-internal rung of the timeout ladder: the global httpclient response-timeout
+        // must never cut before a per-route time-limiter, so the per-route time-limiter stays
+        // authoritative. Payments (15s) is the longest per-route time-limiter.
+        Duration longestPerRouteTimeLimiter = timeLimiterRegistry.timeLimiter("paymentCircuitBreaker")
+                .getTimeLimiterConfig().getTimeoutDuration();
+        assertThat(httpClientResponseTimeout).isGreaterThanOrEqualTo(longestPerRouteTimeLimiter);
+    }
 
     @Test
     void defaultCircuitBreakerConfig_comesFromYaml() {

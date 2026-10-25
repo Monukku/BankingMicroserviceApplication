@@ -33,7 +33,10 @@ spring:
       # ← REMOVED: discovery.locator (was Eureka) — using explicit K8s DNS routes
       httpclient:
         connect-timeout: 1000
-        response-timeout: 15s
+        # Global backstop — must be >= the largest per-route circuit-breaker time-limiter
+        # (payments = 15s) so the per-route time-limiter always fires first and returns the
+        # clean per-route fallback. See RESILIENCE-TIMEOUT-RETRY-AUDIT.md.
+        response-timeout: 16s
 
 # Rate limiting (bucket4j + Redis)
 rate-limiting:

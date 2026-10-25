@@ -43,12 +43,26 @@ spec:
             port:
               number: 80
       timeout: 30s
+    # Payments — ingress timeout must sit ABOVE the gateway payment time-limiter (15s)
+    # so the gateway fails first with its fallback; otherwise the client is told it failed
+    # while the gateway may still be completing the payment (write!). retries 0 — never
+    # retry a payment. See RESILIENCE-TIMEOUT-RETRY-AUDIT.md.
+    - match:
+        - uri:
+            prefix: /api/v1/payments
+      timeout: 18s
+      retries:
+        attempts: 0
+      route:
+        - destination:
+            host: api-gateway-service.banking.svc.cluster.local
+            port:
+              number: 8072
+    # Transactions — ingress 12s > gateway time-limiter 10s (margin, not a tie). retries 0.
     - match:
         - uri:
             prefix: /api/v1/transactions
-        - uri:
-            prefix: /api/v1/payments
-      timeout: 10s
+      timeout: 12s
       retries:
         attempts: 0
       route:
