@@ -90,10 +90,12 @@ spec:
             port:
               number: 8072
       timeout: 30s
+      # retries owned by the per-service backend VirtualServices (one retry layer only).
+      # The old attempts:2 here nested over the backend VS retry (e.g. accounts 2x),
+      # multiplying load on a sick service, and retried gateway-error 503s (incl. the
+      # circuit breaker's own fallback). See RESILIENCE-TIMEOUT-RETRY-AUDIT.md.
       retries:
-        attempts: 2
-        retryOn: connect-failure,reset,gateway-error
-        perTryTimeout: 10s
+        attempts: 0
 ---
 # Internal mesh VirtualService — controls behaviour for service-to-service calls to api-gateway
 apiVersion: networking.istio.io/v1beta1

@@ -8,10 +8,8 @@ import org.springframework.cloud.gateway.filter.ratelimit.RedisRateLimiter;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.HttpMethod;
 import reactor.core.publisher.Mono;
 import org.springframework.context.annotation.Primary;
-import java.time.Duration;
 import java.time.LocalDateTime;
 
 @SpringBootApplication
@@ -92,15 +90,14 @@ public class ApiGatewayApplication {
 								.addResponseHeader(HEADER_RESPONSE_TIME, LocalDateTime.now().toString()))
 						.uri(TRANSACTIONS_URI))
 
-				// ── Loans MS — GET retries ok, write ops no retry ─────────────
+				// ── Loans MS — retries are owned by the Istio layer (one retry layer only).
+				// The gateway previously also retried (2× GET), which combined with the Istio
+				// ingress retry to multiply load on a sick service. See RESILIENCE-TIMEOUT-RETRY-AUDIT.md.
 				.route("loans-service", p -> p
 						.path("/api/v1/loans/**")
 						.filters(f -> f
 								.circuitBreaker(c -> c.setName("loansCircuitBreaker")
 										.setFallbackUri("forward:/fallback/loans"))
-								.retry(r -> r.setRetries(2)          // ← CHANGED: 3→2, GET only
-										.setMethods(HttpMethod.GET)
-										.setBackoff(Duration.ofMillis(100), Duration.ofMillis(500), 2, true))
 								.addResponseHeader(HEADER_RESPONSE_TIME, LocalDateTime.now().toString()))
 						.uri(LOANS_URI))
 

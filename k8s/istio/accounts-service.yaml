@@ -11,9 +11,14 @@ spec:
         - uri:
             prefix: /api/v1/accounts
       timeout: 10s
+      # Sole retry layer for accounts (the ingress no longer retries). Connection-level
+      # only — retryOn connect-failure,reset means we only retry when the request never
+      # reached the app, so a PATCH balance debit/credit (a write) is never double-applied.
+      # gateway-error was dropped so processed-but-5xx writes and CB 503 fallbacks aren't
+      # replayed. See RESILIENCE-TIMEOUT-RETRY-AUDIT.md.
       retries:
         attempts: 2
-        retryOn: gateway-error,reset
+        retryOn: connect-failure,reset
         perTryTimeout: 5s
       route:
         - destination:
