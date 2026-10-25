@@ -21,7 +21,8 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
-      connection-timeout: 30000
+      # 3s (was 30s): fail internally inside the 10s Istio Backend VS.
+      connection-timeout: 3000
       keepalive-time: 30000
 
   jpa:

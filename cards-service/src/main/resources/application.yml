@@ -21,6 +21,8 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
+      # Explicit 3s (was Hikari's 30s default): fail internally inside the 10s Backend VS.
+      connection-timeout: 3000
 
   jpa:
     hibernate:
