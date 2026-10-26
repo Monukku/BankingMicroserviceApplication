@@ -20,6 +20,8 @@ kind: Deployment
 metadata:
   name: audit-ms
   namespace: banking
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
   labels:
     app: audit-ms
 spec:

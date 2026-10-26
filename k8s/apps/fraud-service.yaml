@@ -23,6 +23,8 @@ kind: Deployment
 metadata:
   name: fraud-ms
   namespace: banking
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app: fraud-ms
 spec:

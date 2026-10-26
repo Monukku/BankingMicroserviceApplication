@@ -21,6 +21,8 @@ kind: Deployment
 metadata:
   name: notifications-ms
   namespace: banking
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
   labels:
     app: notifications-ms
 spec:

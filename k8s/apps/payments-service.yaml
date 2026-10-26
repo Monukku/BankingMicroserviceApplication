@@ -25,6 +25,8 @@ kind: Deployment
 metadata:
   name: payments-ms
   namespace: banking
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
   labels:
     app: payments-ms
     version: v1

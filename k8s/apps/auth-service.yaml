@@ -25,6 +25,8 @@ kind: Deployment
 metadata:
   name: auth-ms
   namespace: banking
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app: auth-ms
     version: v1

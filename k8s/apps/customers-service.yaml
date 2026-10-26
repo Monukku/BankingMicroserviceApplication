@@ -26,6 +26,8 @@ kind: Deployment
 metadata:
   name: customers-ms
   namespace: banking
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app: customers-ms
     version: v1

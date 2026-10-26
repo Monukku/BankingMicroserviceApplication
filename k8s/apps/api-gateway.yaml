@@ -28,6 +28,8 @@ kind: Deployment
 metadata:
   name: api-gateway
   namespace: banking
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app: api-gateway
     version: v1
