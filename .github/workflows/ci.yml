@@ -19,12 +19,14 @@ on:
           - all
           - accounts-service
           - api-gateway
+          - audit-service
           - auth-service
           - cards-service
           - customers-service
           - fraud-service
           - loans-service
           - notifications-service
+          - payments-service
           - transactions-service
       image_tag:
         description: 'Custom image tag (leave blank to use git SHA)'
@@ -98,6 +100,9 @@ jobs:
             api-gateway:
               - 'api-gateway/**'
               - 'rewabank-bom/**'
+            audit-service:
+              - 'audit-service/**'
+              - 'rewabank-bom/**'
             auth-service:
               - 'auth-service/**'
               - 'rewabank-bom/**'
@@ -116,6 +121,9 @@ jobs:
             notifications-service:
               - 'notifications-service/**'
               - 'rewabank-bom/**'
+            payments-service:
+              - 'payments-service/**'
+              - 'rewabank-bom/**'
             transactions-service:
               - 'transactions-service/**'
               - 'rewabank-bom/**'
@@ -126,24 +134,28 @@ jobs:
           DISPATCH:             ${{ github.event.inputs.service }}
           CHANGED_ACCOUNTS:     ${{ steps.filter.outputs['accounts-service'] }}
           CHANGED_GATEWAY:      ${{ steps.filter.outputs['api-gateway'] }}
+          CHANGED_AUDIT:        ${{ steps.filter.outputs['audit-service'] }}
           CHANGED_AUTH:         ${{ steps.filter.outputs['auth-service'] }}
           CHANGED_CARDS:        ${{ steps.filter.outputs['cards-service'] }}
           CHANGED_CUSTOMERS:    ${{ steps.filter.outputs['customers-service'] }}
           CHANGED_FRAUD:        ${{ steps.filter.outputs['fraud-service'] }}
           CHANGED_LOANS:        ${{ steps.filter.outputs['loans-service'] }}
           CHANGED_NOTIFICATIONS: ${{ steps.filter.outputs['notifications-service'] }}
+          CHANGED_PAYMENTS:     ${{ steps.filter.outputs['payments-service'] }}
           CHANGED_TRANSACTIONS: ${{ steps.filter.outputs['transactions-service'] }}
         run: |
           # Map service name → "deploy:port:changed_env_var"
           declare -A CATALOG=(
             ["accounts-service"]="accounts-ms:8081:${CHANGED_ACCOUNTS}"
             ["api-gateway"]="api-gateway:8072:${CHANGED_GATEWAY}"
+            ["audit-service"]="audit-ms:9011:${CHANGED_AUDIT}"
             ["auth-service"]="auth-ms:8073:${CHANGED_AUTH}"
             ["cards-service"]="cards-ms:8092:${CHANGED_CARDS}"
             ["customers-service"]="customers-ms:8080:${CHANGED_CUSTOMERS}"
             ["fraud-service"]="fraud-ms:8094:${CHANGED_FRAUD}"
             ["loans-service"]="loans-ms:8090:${CHANGED_LOANS}"
             ["notifications-service"]="notifications-ms:9010:${CHANGED_NOTIFICATIONS}"
+            ["payments-service"]="payments-ms:8083:${CHANGED_PAYMENTS}"
             ["transactions-service"]="transactions-ms:8082:${CHANGED_TRANSACTIONS}"
           )
 
@@ -265,10 +277,11 @@ jobs:
       - name: Install BOM
         run: mvn -f rewabank-bom/pom.xml install -q
 
-      - name: Run tests with coverage
-        run: mvn -f ${{ matrix.dir }}/pom.xml verify -q --fail-at-end
+      - name: Run unit tests with coverage
+        run: mvn -f ${{ matrix.dir }}/pom.xml test -q --fail-at-end
 
       - name: SonarCloud scan
+        if: ${{ secrets.SONAR_TOKEN != '' }}   # skip when unconfigured; blocks via qualitygate.wait when the token IS set
         run: |
           mvn -f ${{ matrix.dir }}/pom.xml sonar:sonar \
             -Dsonar.projectKey=rewabank-${{ matrix.service }} \
@@ -278,7 +291,6 @@ jobs:
             -Dsonar.qualitygate.wait=true \
             -Dsonar.coverage.jacoco.xmlReportPaths=${{ matrix.dir }}/target/site/jacoco/jacoco.xml \
             -q
-        continue-on-error: true    # don't block if SONAR_TOKEN not set yet
 
       - name: Upload test reports
         if: always()
@@ -286,6 +298,45 @@ jobs:
         with:
           name: test-report-${{ matrix.service }}
           path: ${{ matrix.dir }}/target/surefire-reports/
+          retention-days: 7
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 4b — Integration_Tests  (MANDATORY per CLAUDE.md)
+  # Failsafe IT (*IT.java) with Testcontainers. GitHub runners ship Docker, so
+  # Testcontainers can spin up real Postgres/Kafka/Redis/Mongo for boundary tests
+  # (Feign clients, Kafka consumers, DB). Unit tests are skipped here (surefire.skip)
+  # since JOB 4 already ran them — this stage runs ONLY the integration layer.
+  # Blocking: a failing boundary test stops the image from ever being built.
+  # ═══════════════════════════════════════════════════════════════════════════
+  integration-tests:
+    name: Integration_Tests — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [parse-context, build]
+    if: needs.parse-context.outputs.has_changes == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Install BOM
+        run: mvn -f rewabank-bom/pom.xml install -q
+
+      - name: Integration tests (Failsafe + Testcontainers)
+        run: mvn -f ${{ matrix.dir }}/pom.xml verify -q -Dsurefire.skip=true --fail-at-end
+
+      - name: Upload failsafe reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: it-report-${{ matrix.service }}
+          path: ${{ matrix.dir }}/target/failsafe-reports/
           retention-days: 7
 
   # ═══════════════════════════════════════════════════════════════════════════
@@ -313,6 +364,7 @@ jobs:
         run: mvn -f rewabank-bom/pom.xml install -q
 
       - name: OWASP Dependency Check
+        if: ${{ secrets.NVD_API_KEY != '' }}   # needs the NVD key to run reliably; blocks on CVSS>=9 when set, skips otherwise
         run: |
           mvn -f ${{ matrix.dir }}/pom.xml \
             org.owasp:dependency-check-maven:check \
@@ -322,7 +374,6 @@ jobs:
             -DnvdApiKey=${{ secrets.NVD_API_KEY }} \
             -DnvdApiDelay=6000 \
             -q
-        continue-on-error: true    # NVD 429 rate-limit should warn, not block
 
       - name: Upload report
         if: always()
@@ -404,7 +455,6 @@ jobs:
             -DoutputFormats=HTML,XML \
             -DmutationThreshold=60 \
             -q
-        continue-on-error: true
 
       - name: Upload mutation report
         if: always()
@@ -460,7 +510,7 @@ jobs:
   build-docker:
     name: Build_Docker — ${{ matrix.service }}
     runs-on: ubuntu-latest
-    needs: [parse-context, unit-tests-sonarqube, dependency-scan, sca-scan, base-image-validation]
+    needs: [parse-context, unit-tests-sonarqube, integration-tests, dependency-scan, sca-scan, base-image-validation]
     if: |
       (needs.parse-context.outputs.has_changes == 'true') &&
       (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
@@ -717,6 +767,36 @@ jobs:
           git push
 
   # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 14b — Post_Deploy_Smoke  (best-effort reachability check)
+  # Argo CD deploys to a LOCAL k3d cluster that GitHub runners CANNOT reach, so a
+  # true in-cluster smoke test is not possible from CI. This pings the PUBLIC
+  # Cloudflare entry point instead — if the laptop + `cloudflared` tunnel are up it
+  # confirms the stack is serving; if they're offline it just warns. NON-BLOCKING by
+  # design. Real per-service verification is done locally (kubectl + load-test/).
+  # ═══════════════════════════════════════════════════════════════════════════
+  post-deploy-smoke:
+    name: Post_Deploy_Smoke
+    runs-on: ubuntu-latest
+    needs: [parse-context, create-deployment-package]
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Give Argo CD time to sync the new digest
+        run: sleep 60
+
+      - name: Probe public ingress (best-effort)
+        run: |
+          BASE="https://api.rewarealm.com"
+          echo "Probing ${BASE}/auth/realms/rewabank (Keycloak realm = stack reachable end-to-end)"
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "${BASE}/auth/realms/rewabank" || echo "000")
+          echo "HTTP ${code}"
+          if [ "$code" = "200" ]; then
+            echo " Public ingress reachable — deployed stack is serving."
+          else
+            echo "⚠️  Not reachable (HTTP ${code}). Laptop/cloudflared likely offline — verify the deploy locally."
+          fi
+        continue-on-error: true
+
+  # ═══════════════════════════════════════════════════════════════════════════
   # JOB 15 — Tag_Deployment_Artifact
   # Creates immutable git tag for the deployed version.
   # Gives ops team a named rollback point.
@@ -761,6 +841,7 @@ jobs:
       - build
       - base-image-validation
       - unit-tests-sonarqube
+      - integration-tests
       - dependency-scan
       - sca-scan
       - mutation-test
@@ -771,6 +852,7 @@ jobs:
       - generate-scorecard
       - publish-artifacts
       - create-deployment-package
+      - post-deploy-smoke
       - tag-deployment-artifact
     steps:
       - name: Print receipt
@@ -791,6 +873,7 @@ jobs:
           echo "║  Build                  → ${{ needs.build.result }}"
           echo "║  Base_Image_Validation  → ${{ needs.base-image-validation.result }}"
           echo "║  Unit_Tests_SonarQube   → ${{ needs.unit-tests-sonarqube.result }}"
+          echo "║  Integration_Tests      → ${{ needs.integration-tests.result }}"
           echo "║  Dependency_Scan        → ${{ needs.dependency-scan.result }}"
           echo "║  SCA_Scan               → ${{ needs.sca-scan.result }}"
           echo "║  Mutation_Test          → ${{ needs.mutation-test.result }}"
@@ -801,6 +884,7 @@ jobs:
           echo "║  Generate_Scorecard     → ${{ needs.generate-scorecard.result }}"
           echo "║  Publish_Artifacts      → ${{ needs.publish-artifacts.result }}"
           echo "║  Create_Deployment_Pkg  → ${{ needs.create-deployment-package.result }}"
+          echo "║  Post_Deploy_Smoke      → ${{ needs.post-deploy-smoke.result }}"
           echo "║  Tag_Deployment         → ${{ needs.tag-deployment-artifact.result }}"
           echo "╠══════════════════════════════════════════════════════════════╣"
           if [[ "${{ needs.publish-artifacts.result }}" == "success" ]]; then
