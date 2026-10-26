@@ -14,7 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,7 +52,7 @@ class ExternalEventConsumerTest {
     }
 
     @Test
-    void handleKycVerified_activationFails_swallowsExceptionAndContinues() {
+    void handleKycVerified_activationFails_propagatesAfterProcessingRemaining() {
         UUID customerId = UUID.randomUUID();
         Account a1 = mock(Account.class);
         Account a2 = mock(Account.class);
@@ -63,10 +64,14 @@ class ExternalEventConsumerTest {
                 .thenReturn(List.of(a1, a2));
         doThrow(new RuntimeException("DB error")).when(accountService).activateAccount(id1);
 
-        // Should NOT throw — exception is swallowed per account
-        consumer.handleKycVerified(Map.of("customerId", customerId.toString()));
+        // The handler isolates per-account failures (so one bad account doesn't block the
+        // others) but then rethrows an aggregate. Propagation is REQUIRED: it lets Spring
+        // Kafka @RetryableTopic retry the event and, once retries are exhausted, route it to
+        // the DLT. Swallowing here would silently drop the failed activation.
+        assertThrows(RuntimeException.class,
+                () -> consumer.handleKycVerified(Map.of("customerId", customerId.toString())));
 
-        // Second account still processed
+        // Fail-isolation: the second account is still attempted before the aggregate is thrown.
         verify(accountService).activateAccount(id2);
     }
 
@@ -94,12 +99,19 @@ class ExternalEventConsumerTest {
     }
 
     @Test
-    void handleFraudAlert_freezeFails_swallowsException() {
+    void handleFraudAlert_freezeFails_propagatesForRetry() {
         UUID accountId = UUID.randomUUID();
         doThrow(new RuntimeException("Freeze failed")).when(accountService)
                 .freezeAccount(any(), any());
 
-        // Should NOT rethrow — exception is swallowed
-        consumer.handleFraudAlert(Map.of("accountId", accountId.toString()));
+        // The handler has no try-catch by design: the exception must propagate so
+        // @RetryableTopic retries the fraud event (then DLT). Swallowing would leave a
+        // fraud-flagged account un-frozen.
+        assertThrows(RuntimeException.class,
+                () -> consumer.handleFraudAlert(Map.of("accountId", accountId.toString())));
+
+        // No partial side effect on the failure path: only the freeze was attempted.
+        verify(accountService).freezeAccount(eq(accountId), any());
+        verifyNoMoreInteractions(accountService);
     }
 }
