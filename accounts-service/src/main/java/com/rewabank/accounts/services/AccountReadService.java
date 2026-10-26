@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,8 +27,29 @@ import java.time.LocalDateTime;
 public class AccountReadService {
 
     private final AccountsRepository accountRepository;
+    private final AccountAccessPolicy accessPolicy;
 
-    // Read balance from Redis — falls through to DB on cache miss
+    /**
+     * Ownership-guarded balance read (customer-facing endpoint).
+     *
+     * The ownership check MUST run on every request, so it cannot live inside the
+     * {@link #getBalance(String)} method below — that one is {@code @Cacheable} and a
+     * cache hit would short-circuit the method (and skip the check). We load the
+     * account here (which also yields the balance) and guard before returning.
+     * Owner or a privileged role → 200; any other caller → ACCT_002 (404), no leak.
+     */
+    @Transactional(readOnly = true)
+    public BalanceResponse getBalanceForCaller(String accountNumber, Jwt jwt) {
+        Account account = accountRepository
+                .findByAccountNumberAndDeletedAtIsNull(accountNumber)
+                .orElseThrow(() -> new AccountException("ACCT_002", "Account not found"));
+        accessPolicy.requireReadAccess(account.getKeycloakUserId(), jwt);
+        return toBalanceResponse(account);
+    }
+
+    // Read balance from Redis — falls through to DB on cache miss.
+    // NOTE: unguarded data read — must only be called after an ownership check
+    // (see getBalanceForCaller) or from trusted internal/write paths.
     @Cacheable(value = "account-balance", key = "#accountNumber")
     @Transactional(readOnly = true)
     public BalanceResponse getBalance(String accountNumber) {

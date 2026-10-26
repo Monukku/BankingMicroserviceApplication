@@ -75,9 +75,10 @@ public class AccountController {
     @GetMapping("/{accountNumber}/balance")
     @Operation(summary = "Get account balance (CQRS — Redis read)")
     public ResponseEntity<BalanceResponse> getBalance(
-            @PathVariable String accountNumber) {
+            @PathVariable String accountNumber,
+            @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(
-                accountReadService.getBalance(accountNumber));
+                accountReadService.getBalanceForCaller(accountNumber, jwt));
     }
 
     // Get accounts by status — staff only (TELLER, BRANCH_MANAGER, SUPER_ADMIN)
