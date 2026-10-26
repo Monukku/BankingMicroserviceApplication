@@ -56,30 +56,33 @@ public class KeycloakUserService {
         credential.setTemporary(false);
         user.setCredentials(List.of(credential));
 
-        Response response = usersResource.create(user);
+        // try-with-resources: jakarta.ws.rs.core.Response is AutoCloseable; closing it
+        // releases the underlying HTTP connection back to the pool (avoids a leak warning).
+        try (Response response = usersResource.create(user)) {
 
-        if (response.getStatus() == 201) {
-            String locationHeader = response.getHeaderString("Location");
-            String keycloakUserId = locationHeader.substring(locationHeader.lastIndexOf("/") + 1);
-            log.info("User created in Keycloak: {}", keycloakUserId);
+            if (response.getStatus() == 201) {
+                String locationHeader = response.getHeaderString("Location");
+                String keycloakUserId = locationHeader.substring(locationHeader.lastIndexOf("/") + 1);
+                log.info("User created in Keycloak: {}", keycloakUserId);
 
-            // Assign default CUSTOMER role — if this fails, delete the created user
-            // to avoid an orphan account that can never log in and blocks re-registration.
-            try {
-                assignRole(keycloakUserId, "CUSTOMER");
-            } catch (Exception e) {
-                log.error("Role assignment failed for {} — deleting orphan user: {}",
-                        keycloakUserId, e.getMessage());
-                deleteUser(keycloakUserId);
-                throw new AuthException("AUTH_002", "User registration failed: role assignment error");
+                // Assign default CUSTOMER role — if this fails, delete the created user
+                // to avoid an orphan account that can never log in and blocks re-registration.
+                try {
+                    assignRole(keycloakUserId, "CUSTOMER");
+                } catch (Exception e) {
+                    log.error("Role assignment failed for {} — deleting orphan user: {}",
+                            keycloakUserId, e.getMessage());
+                    deleteUser(keycloakUserId);
+                    throw new AuthException("AUTH_002", "User registration failed: role assignment error");
+                }
+
+                return keycloakUserId;
+            } else if (response.getStatus() == 409) {
+                throw new AuthException("AUTH_001", "User already exists");
+            } else {
+                log.error("Keycloak user creation failed — status: {}", response.getStatus());
+                throw new AuthException("AUTH_002", "User registration failed");
             }
-
-            return keycloakUserId;
-        } else if (response.getStatus() == 409) {
-            throw new AuthException("AUTH_001", "User already exists");
-        } else {
-            log.error("Keycloak user creation failed — status: {}", response.getStatus());
-            throw new AuthException("AUTH_002", "User registration failed");
         }
     }
 

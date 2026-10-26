@@ -260,6 +260,8 @@ jobs:
     name: Unit_Tests_SonarQube — ${{ matrix.service }}
     runs-on: ubuntu-latest
     needs: [parse-context, build]
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}   # mapped so the step `if:` can check env.SONAR_TOKEN
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
@@ -281,13 +283,13 @@ jobs:
         run: mvn -f ${{ matrix.dir }}/pom.xml test -q --fail-at-end
 
       - name: SonarCloud scan
-        if: ${{ secrets.SONAR_TOKEN != '' }}   # skip when unconfigured; blocks via qualitygate.wait when the token IS set
+        if: env.SONAR_TOKEN != ''   # skip when unconfigured; blocks via qualitygate.wait when the token IS set
         run: |
           mvn -f ${{ matrix.dir }}/pom.xml sonar:sonar \
             -Dsonar.projectKey=rewabank-${{ matrix.service }} \
             -Dsonar.organization=monukku \
             -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.token=${{ env.SONAR_TOKEN }} \
             -Dsonar.qualitygate.wait=true \
             -Dsonar.coverage.jacoco.xmlReportPaths=${{ matrix.dir }}/target/site/jacoco/jacoco.xml \
             -q
@@ -348,6 +350,8 @@ jobs:
     name: Dependency_Scan — ${{ matrix.service }}
     runs-on: ubuntu-latest
     needs: [parse-context, build]
+    env:
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}   # mapped so the step `if:` can check env.NVD_API_KEY
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.parse-context.outputs.matrix) }}
@@ -364,14 +368,14 @@ jobs:
         run: mvn -f rewabank-bom/pom.xml install -q
 
       - name: OWASP Dependency Check
-        if: ${{ secrets.NVD_API_KEY != '' }}   # needs the NVD key to run reliably; blocks on CVSS>=9 when set, skips otherwise
+        if: env.NVD_API_KEY != ''   # needs the NVD key to run reliably; blocks on CVSS>=9 when set, skips otherwise
         run: |
           mvn -f ${{ matrix.dir }}/pom.xml \
             org.owasp:dependency-check-maven:check \
             -DfailBuildOnCVSS=9 \
             -DassemblyAnalyzerEnabled=false \
             -Dformats=HTML,JSON \
-            -DnvdApiKey=${{ secrets.NVD_API_KEY }} \
+            -DnvdApiKey=${{ env.NVD_API_KEY }} \
             -DnvdApiDelay=6000 \
             -q
 
