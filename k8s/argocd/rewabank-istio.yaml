@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rewabank-istio
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Monukku/BankingMicroserviceApplication.git
+    targetRevision: feature/microservices-restructure   # install-argocd.ps1 overrides this
+    path: k8s/istio
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: banking     # default ns; the Gateway resource targets istio-system explicitly
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true   # safer for Istio CRDs (VirtualService/DestinationRule)

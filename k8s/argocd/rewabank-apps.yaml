@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rewabank-apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Monukku/BankingMicroserviceApplication.git
+    targetRevision: feature/microservices-restructure   # install-argocd.ps1 overrides this
+    path: k8s/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: banking
+  syncPolicy:
+    automated:
+      selfHeal: true    # revert manual drift back to Git
+      prune: false      # start safe — flip to true once you trust the scope
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
