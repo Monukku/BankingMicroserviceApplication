@@ -15,6 +15,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -36,7 +37,12 @@ class AccountReadServiceCacheTest {
     @TestConfiguration
     @EnableCaching
     static class CacheTestConfig {
-        @Bean
+        // Named 'testCacheManager' (not 'cacheManager') so it does NOT collide with the
+        // RedisCacheManager bean named 'cacheManager' in RedisConfig — bean-definition
+        // overriding is disabled (Spring Boot default). @Primary makes the by-type
+        // @Autowired CacheManager + @EnableCaching resolve to this in-memory manager.
+        @Bean("testCacheManager")
+        @Primary
         public CacheManager cacheManager() {
             return new ConcurrentMapCacheManager("account-balance");
         }
