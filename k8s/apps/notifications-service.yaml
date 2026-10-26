@@ -26,7 +26,7 @@ metadata:
   labels:
     app: notifications-ms
 spec:
-  replicas: 1
+  replicas: 0   # parked at 0 to free local resources; HPA removed below so this holds. Set back to 1 + restore HPA to re-enable.
   selector:
     matchLabels:
       app: notifications-ms
@@ -93,26 +93,9 @@ spec:
       port: 9010
       targetPort: 9010
   type: ClusterIP
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: notifications-ms-hpa
-  namespace: banking
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: notifications-ms
-  minReplicas: 1
-  maxReplicas: 1
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
+# NOTE: HorizontalPodAutoscaler removed — it had minReplicas:1, which would
+# override replicas:0 above and scale the service back up. Restore it (git
+# history) together with replicas:1 when re-enabling notifications-ms.
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
