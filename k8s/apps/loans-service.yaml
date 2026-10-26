@@ -50,6 +50,7 @@ spec:
       containers:
         - name: loans-ms
           image: rewabank/loans-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8090
           envFrom:

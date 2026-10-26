@@ -48,7 +48,7 @@ spec:
       containers:
         - name: transactions-ms
           image: rewabank/transactions-service:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8082
           envFrom:

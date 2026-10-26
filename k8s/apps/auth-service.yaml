@@ -48,6 +48,7 @@ spec:
       containers:
         - name: auth-ms
           image: rewabank/auth-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8073
           envFrom:

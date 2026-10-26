@@ -48,6 +48,7 @@ spec:
       containers:
         - name: payments-ms
           image: rewabank/payments-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8083
           envFrom:

@@ -50,6 +50,7 @@ spec:
       containers:
         - name: cards-ms
           image: rewabank/cards-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8092
           envFrom:

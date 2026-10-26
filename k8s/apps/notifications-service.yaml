@@ -42,6 +42,7 @@ spec:
       containers:
         - name: notifications-ms
           image: rewabank/notifications-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9010
           envFrom:

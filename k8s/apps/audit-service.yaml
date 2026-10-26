@@ -41,6 +41,7 @@ spec:
       containers:
         - name: audit-ms
           image: rewabank/audit-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9011
           envFrom:

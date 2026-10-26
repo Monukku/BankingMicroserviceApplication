@@ -51,6 +51,7 @@ spec:
       containers:
         - name: api-gateway
           image: rewabank/api-gateway:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8072
           envFrom:
