@@ -43,6 +43,22 @@ spec:
             port:
               number: 80
       timeout: 30s
+    # Argo CD UI — permanent route so no port-forward needed. argocd-server runs
+    # --insecure (serves plain HTTP; TLS terminated at Cloudflare edge like everything
+    # else) and server.rootpath=/argocd so it serves under this subpath. Config lives in
+    # the argocd-cmd-params-cm ConfigMap (argocd namespace), not Git. The path is NOT
+    # rewritten — argocd-server receives /argocd/... which matches its rootpath.
+    # NOTE: reachable at the public entry point (like Keycloak admin at /auth); protected
+    # by Argo's own admin login.
+    - match:
+        - uri:
+            prefix: /argocd
+      route:
+        - destination:
+            host: argocd-server.argocd.svc.cluster.local
+            port:
+              number: 80
+      timeout: 30s
     # Payments — ingress timeout must sit ABOVE the gateway payment time-limiter (15s)
     # so the gateway fails first with its fallback; otherwise the client is told it failed
     # while the gateway may still be completing the payment (write!). retries 0 — never
