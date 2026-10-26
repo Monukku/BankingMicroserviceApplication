@@ -3,6 +3,7 @@ package com.rewabank.auth.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -57,6 +58,20 @@ public class GlobalExceptionHandler {
                 "message",     "Validation failed",
                 "fieldErrors", fieldErrors,
                 "path",        request.getDescription(false).replace("uri=", "")
+        ));
+    }
+
+    // @PreAuthorize denials throw AuthorizationDeniedException (a subclass of AccessDeniedException).
+    // Without this specific handler, the generic Exception handler below would turn a 403 into a 500.
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex, WebRequest request) {
+        log.warn("Access denied: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "timestamp", LocalDateTime.now().toString(),
+                "status",    403,
+                "errorCode", "AUTH_403",
+                "message",   "Access denied",
+                "path",      request.getDescription(false).replace("uri=", "")
         ));
     }
 
