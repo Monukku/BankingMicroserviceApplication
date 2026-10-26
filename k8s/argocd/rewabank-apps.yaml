@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/Monukku/BankingMicroserviceApplication.git
-    targetRevision: feature/microservices-restructure   # install-argocd.ps1 overrides this
+    targetRevision: master   # install-argocd.ps1 overrides this via -Branch
     path: k8s/apps
   destination:
     server: https://kubernetes.default.svc

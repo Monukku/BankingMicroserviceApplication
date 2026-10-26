@@ -12,7 +12,7 @@
     .\install-argocd.ps1 -Branch feature/microservices-restructure
 #>
 param(
-    [string]$Branch     = "feature/microservices-restructure",
+    [string]$Branch     = "master",
     [string]$ArgoVersion = "stable",     # or a pinned tag like v2.13.2
     [int]   $UiPort      = 8090           # local UI: https://localhost:<UiPort>
 )
