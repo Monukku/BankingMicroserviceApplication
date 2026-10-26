@@ -1,4 +1,5 @@
 # RewaBank — Local K8s + Istio Setup
+# Docker desktop crash sol run  "wsl --shutdown" instead restarting system
 ## k3d on Windows 16GB RAM (Lightweight — No Docker Desktop K8s)
 
 ## Overview
@@ -1697,7 +1698,92 @@ $TOKEN = .\load-test\get-token.ps1 -User "testuser" -Password "Test@1234"
 # Test everything — skip nothing
 .\load-test\load-test.ps1 -Token $TOKEN -DisabledServices @()
 ```
-
+//arghoCd username: admin password: argho@Admin2026
 > **Note:** the generator has a built-in 1-second think-time per virtual user,
 > so throughput is capped at roughly `Users` req/s. A 2-user run tops out at ~2 req/s —
 > that's by design, not a bottleneck. Use 50+ users for a meaningful throughput number.
+
+---
+
+# STEP 16 — Argo CD GitOps (automated deploy)
+
+Argo CD runs **inside** the cluster (namespace `argocd`) and continuously syncs the
+manifests under `k8s/apps` + `k8s/istio` from the **`master`** branch on GitHub into the
+`banking` namespace. Push a manifest change → Argo deploys it. No manual `kubectl apply`.
+
+> **The split:** Argo handles **config** (timeouts, replicas, env, Istio VS/DR). It does
+> **not** build images. Images come from the **CI pipeline** (`.github/workflows/ci.yml`):
+> on a push to `master`, CI builds + scans + pushes to Docker Hub, then pins the sha256
+> **digest** into `k8s/apps/<svc>.yaml` and commits it back to `master`. Argo sees the
+> manifest change and deploys it; k3d pulls the image from Docker Hub (images are public).
+
+## One-time install
+```powershell
+# Docker Desktop + the k3d 'rewabank' cluster must be up first
+.\k8s\argocd\install-argocd.ps1 -Branch master
+```
+This installs Argo CD, configures `argocd-server` for the `/argocd` ingress route
+(`--insecure` + `server.rootpath=/argocd`), and registers two Applications:
+`rewabank-apps` (watches `k8s/apps`) and `rewabank-istio` (watches `k8s/istio`).
+
+## Access the UI — permanent URL (no port-forward)
+A `/argocd` route is wired into the Istio ingress (`k8s/istio/api-gateway.yaml`), so:
+
+| Access | URL |
+|---|---|
+| Local | `http://localhost/argocd` |
+| External (needs `cloudflared tunnel run rewabank`) | `https://api.rewarealm.com/argocd` |
+
+**Login:** `admin` / `sdiYnqVpYKm61XBJ`
+> (On a fresh install the password is the auto-generated one in the
+> `argocd-initial-admin-secret` — change it to the above via the UI / `argocd account update-password`.)
+
+Fallback if the route is ever down:
+```powershell
+kubectl port-forward svc/argocd-server -n argocd 8090:443   # then https://localhost:8090
+```
+
+## Staggered rollout (sync-waves) — avoids the reconnect storm
+Deploying all DB-backed services at once triggers a thundering-herd reconnect against
+external **Neon Postgres** + **MongoDB** → `500` health → liveness restart loop. Each
+Deployment carries an `argocd.argoproj.io/sync-wave` annotation so Argo rolls **≤2 at a
+time**, never two services on the same external DB together, waiting for each wave to be
+Healthy before the next:
+
+| Wave | Services |
+|---|---|
+| 1 | api-gateway + auth-ms |
+| 2 | fraud-ms + customers-ms |
+| 3 | audit-ms + accounts-ms |
+| 4 | notifications-ms + transactions-ms |
+| 5 | payments-ms |
+
+## Disabled / parked services (RAM)
+- **loans-ms + cards-ms** — moved to `k8s/apps-disabled/` (out of Argo's `k8s/apps` path).
+  They target an in-cluster Postgres that isn't deployed and have no image here. Re-enable
+  by moving the file back into `k8s/apps/`.
+- **notifications-ms** — `replicas: 0` in Git, HPA removed (it was the top CPU user). It's a
+  pure async Kafka consumer, so Kafka retains events and it catches up when scaled back up.
+
+## Common operations
+```powershell
+# See Application status
+kubectl get applications -n argocd
+
+# Disable auto-sync (take manual control — e.g. to sync one resource at a time in the UI)
+kubectl patch application rewabank-apps -n argocd --type merge -p '{\"spec\":{\"syncPolicy\":{\"automated\":null}}}'
+
+# Re-enable auto-sync (selfHeal on, prune off) — rolls out in sync-waves
+kubectl patch application rewabank-apps -n argocd --type merge -p '{\"spec\":{\"syncPolicy\":{\"automated\":{\"selfHeal\":true,\"prune\":false}}}}'
+
+# Force Argo to re-read GitHub immediately
+kubectl annotate application rewabank-apps -n argocd argocd.argoproj.io/refresh=hard --overwrite
+
+# One-off local image build (bypass CI) — build, import into k3d, roll the deployment
+.\k8s\argocd\build-and-import.ps1 -Service api-gateway
+```
+
+> **RAM note:** the Docker Desktop VM (~10.4 GB) sits ~80% full with the full stack + Argo's
+> 7 pods even when idle. A mass rollout surge can tip it over → restart churn. Keep
+> notifications parked and loans/cards disabled, or raise Docker RAM to 14–16 GB. See the
+> RAM Saving Tips section above.
