@@ -58,9 +58,11 @@ public class AccountController {
 
     // Get account by ID
     @GetMapping("/{id}")
-    @Operation(summary = "Get account by ID")
-    public ResponseEntity<AccountResponse> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(accountService.getById(id));
+    @Operation(summary = "Get account by ID — owner, staff, or internal service only")
+    public ResponseEntity<AccountResponse> getById(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(accountService.getByIdForCaller(id, jwt));
     }
 
     // Lookup by account number — used by transactions-service and frontend review screen
