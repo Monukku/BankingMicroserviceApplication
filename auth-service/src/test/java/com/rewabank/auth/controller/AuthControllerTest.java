@@ -9,6 +9,8 @@ import com.rewabank.auth.service.KeycloakUserService;
 import com.rewabank.auth.service.OtpService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.keycloak.admin.client.Keycloak;
+import org.mockito.Answers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +32,10 @@ class AuthControllerTest {
     @Mock OtpService            otpService;
     @Mock BankingUserRepository bankingUserRepository;
     @Mock AuthEventProducer     authEventProducer;
+    // getCurrentUser() reads first/last name via keycloak.realm(..).users().get(..).toRepresentation().
+    // Deep stubs return mocks through that chain so @InjectMocks passes a non-null Keycloak and the
+    // chain doesn't NPE; names come back null -> fullName falls back to the DB user's fullName.
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS) Keycloak keycloak;
     @InjectMocks AuthController controller;
 
     private BankingUser stubUser(String mobile) {
