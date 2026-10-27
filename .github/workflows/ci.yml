@@ -279,8 +279,12 @@ jobs:
       - name: Install BOM
         run: mvn -f rewabank-bom/pom.xml install -q
 
+      # `jacoco:report` is bound to the verify phase in the BOM; invoke the goal
+      # explicitly after `test` so we get unit-test coverage (target/site/jacoco/
+      # jacoco.xml) without running the Testcontainers integration tests here —
+      # those are JOB 4b's job. Without this report, Sonar sees 0% new-code coverage.
       - name: Run unit tests with coverage
-        run: mvn -f ${{ matrix.dir }}/pom.xml test -q --fail-at-end
+        run: mvn -f ${{ matrix.dir }}/pom.xml test org.jacoco:jacoco-maven-plugin:report -q --fail-at-end
 
       - name: SonarCloud scan
         if: env.SONAR_TOKEN != ''   # skip when unconfigured; blocks via qualitygate.wait when the token IS set
