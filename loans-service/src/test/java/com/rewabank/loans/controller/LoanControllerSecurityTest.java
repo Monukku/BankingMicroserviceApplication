@@ -210,50 +210,9 @@ class LoanControllerSecurityTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // ── Rule: Role-based access control on staff operations ──────────────────
-
-    @Test
-    void startReview_Returns403_WhenCustomerRole() throws Exception {
-        mockMvc.perform(patch("/api/v1/loans/{id}/review/start", UUID.randomUUID())
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void review_Returns403_WhenCustomerRole() throws Exception {
-        LoanReviewRequest req = new LoanReviewRequest(
-                "APPROVE", new BigDecimal("50000.00"),
-                new BigDecimal("10.5"), null, null);
-
-        mockMvc.perform(patch("/api/v1/loans/{id}/review", UUID.randomUUID())
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER")))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void disburse_Returns403_WhenCustomerRole() throws Exception {
-        mockMvc.perform(patch("/api/v1/loans/{id}/disburse", UUID.randomUUID())
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void getAllLoans_Returns403_WhenCustomerRole() throws Exception {
-        mockMvc.perform(get("/api/v1/loans")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void getByStatus_Returns403_WhenCustomerRole() throws Exception {
-        mockMvc.perform(get("/api/v1/loans/status/{status}", "APPLIED")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
-                .andExpect(status().isForbidden());
-    }
-
     // ── Rule: Malformed path variables must be rejected gracefully ───────────
+    // (Role-based @PreAuthorize 403/200 checks live in LoanControllerAuthorizationTest,
+    //  which runs with the security filter chain ON.)
 
     @Test
     void getById_Returns400_WhenIdIsNotUuid() throws Exception {
@@ -276,15 +235,4 @@ class LoanControllerSecurityTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // ── Rule: CREDIT_OFFICER can access review endpoints ─────────────────────
-
-    @Test
-    void getAllLoans_Returns200_WhenCreditOfficerRole() throws Exception {
-        org.mockito.Mockito.when(loanService.getAllLoans(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(org.springframework.data.domain.Page.empty());
-
-        mockMvc.perform(get("/api/v1/loans")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CREDIT_OFFICER"))))
-                .andExpect(status().isOk());
-    }
 }
