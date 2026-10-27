@@ -66,6 +66,18 @@ class AccountReadServiceTest {
     }
 
     @Test
+    void getBalanceForCaller_ShouldThrowAccountException_WhenAccountNotFound() {
+        // Ownership-guarded read: a missing account must 404 (ACCT_002) before any
+        // ownership check runs — no existence leak.
+        when(accountsRepository.findByAccountNumberAndDeletedAtIsNull("nonexistent"))
+                .thenReturn(Optional.empty());
+
+        AccountException ex = assertThrows(AccountException.class,
+                () -> accountReadService.getBalanceForCaller("nonexistent", null));
+        assertEquals("ACCT_002", ex.getErrorCode());
+    }
+
+    @Test
     void getBalance_ShouldReturnZeroAvailableBalance_WhenBalanceEqualsMinimum() {
         activeAccount.setBalance(new BigDecimal("1000.00"));
         activeAccount.setMinimumBalance(new BigDecimal("1000.00"));
