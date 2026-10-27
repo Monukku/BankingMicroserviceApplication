@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,6 +40,8 @@ class CustomerControllerSecurityTest {
     @SuppressWarnings("deprecation") @MockBean CustomerService customerService;
     @SuppressWarnings("deprecation") @MockBean S3Client        s3Client;
     @SuppressWarnings("deprecation") @MockBean S3Presigner     s3Presigner;
+    @SuppressWarnings("deprecation") @MockBean KafkaTemplate<?, ?> kafkaTemplate;
+    @SuppressWarnings("deprecation") @MockBean RedisConnectionFactory redisConnectionFactory;
 
     private static final UUID OTHER_CUSTOMER_ID = UUID.randomUUID();
 

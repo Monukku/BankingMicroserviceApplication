@@ -32,7 +32,7 @@ class AuthEventConsumerTest {
 
     @Test
     void handleUserRegistered_newCustomer_createsProfileWithCorrectFields() {
-        when(customerRepository.existsByKeycloakUserIdAndDeletedAtIsNull("kc-new-1"))
+        when(customerRepository.existsByKeycloakUserId("kc-new-1"))
                 .thenReturn(false);
 
         authEventConsumer.handleUserRegistered(event("kc-new-1"));
@@ -50,7 +50,7 @@ class AuthEventConsumerTest {
     @Test
     void handleUserRegistered_existingCustomer_skipsCreate() {
         // Kills NegateConditionals on the idempotency guard
-        when(customerRepository.existsByKeycloakUserIdAndDeletedAtIsNull("kc-existing-1"))
+        when(customerRepository.existsByKeycloakUserId("kc-existing-1"))
                 .thenReturn(true);
 
         authEventConsumer.handleUserRegistered(event("kc-existing-1"));
