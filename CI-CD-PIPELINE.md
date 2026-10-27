@@ -23,7 +23,7 @@ Parse_Context → Build → Base_Image_Validation → Unit_Tests_SonarQube
 |---|---|---|
 | Unit Tests | Maven Surefire | Same |
 | Code Quality | SonarCloud | SonarQube |
-| Dependency CVE scan | Trivy (filesystem / SCA) | JFrog Xray |
+| Dependency CVE scan | Trivy (CycloneDX SBOM) | JFrog Xray |
 | SCA (license + CVE) | Snyk | Snyk Enterprise |
 | Mutation Testing | PIT (pitest-maven) | Same |
 | SAST | CodeQL | Snyk SAST / Checkmarx |
@@ -154,7 +154,7 @@ Require status checks to pass`.
 | `Build — <service>` | ✅ | compile must pass |
 | `Unit_Tests_SonarQube — <service>` | ✅ | tests + SonarCloud quality gate |
 | `Integration_Tests — <service>` | ✅ | Failsafe + Testcontainers |
-| `Dependency_Scan` | ✅ | **Trivy filesystem scan** (single repo-wide job — replaced the per-service OWASP checks) |
+| `Dependency_Scan` | ✅ | **Trivy CycloneDX SBOM scan** (single repo-wide job — replaced the per-service OWASP checks) |
 | `SAST_Scan` / `CodeQL` | ✅ | static analysis |
 | `SCA_Scan — <service>` | ➖ | Snyk, `continue-on-error` |
 
@@ -255,22 +255,26 @@ the security team even if it doesn't block the build.
 ### JOB 5 — Dependency_Scan
 
 **What it does:**
-- Runs a Trivy **filesystem scan** (`scan-type: fs`) over the whole repo tree
-- Trivy detects every service's `pom.xml` (and any lockfiles) and checks the
-  resolved dependencies against its CVE database
-- `exit-code: 1` + `severity: HIGH,CRITICAL` — blocks the PR on any HIGH or
-  CRITICAL dependency CVE
-- `ignore-unfixed: true` — only flags CVEs that actually have a fix available
-- Uploads SARIF to the GitHub Security tab (category `trivy-fs`)
+- Generates a **CycloneDX SBOM** for the whole Maven reactor via
+  `cyclonedx-maven-plugin:makeAggregateBom` (`includeTestScope=false` → shipped/
+  runtime deps only), written to `target/bom.json` and uploaded as an artifact
+- Installs Trivy `v0.76.1` (SHA-pinned action) and runs `trivy sbom` on that SBOM
+- `--exit-code 1` + `--severity HIGH,CRITICAL` + `--ignore-unfixed` — blocks the
+  PR on any **fixable** HIGH/CRITICAL dependency CVE
+- Prints a human-readable findings table to the job log, and uploads SARIF to the
+  GitHub Security tab (category `trivy-sbom`)
+- A root `.trivyignore` carries documented no-fix / false-positive waivers (each
+  with a reason + review date)
 
 **Enterprise equivalent:** JFrog Xray dependency scan
 
-**Why Trivy and not OWASP Dependency-Check:**
-Trivy already runs the base-image and image scans (Jobs 3 + 10), so dependency
-scanning reuses the same engine and CVE database — one tool, no NVD API key to
-manage, and no NVD rate-limit flakiness. It runs on PRs (needs only
-`parse-context`), so vulnerable dependencies are caught *before* an image is
-ever built, not just at image-scan time.
+**Why SBOM and not a raw `trivy fs` over `pom.xml`:**
+Our dependency versions are managed by `rewabank-bom` (BOM `dependencyManagement`),
+so a static `pom.xml` scan can't resolve them (`version cannot be determined`) and
+scans incompletely. A CycloneDX SBOM has fully-resolved versions, so the scan is
+complete. It reuses Trivy (same engine + CVE DB as the base/image scans, no NVD
+API key) and runs on PRs (needs only `parse-context`), catching vulnerable
+dependencies *before* an image is built.
 
 ---
 

@@ -238,6 +238,7 @@ jobs:
       - name: Trivy — scan base image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
+          version: v0.76.1
           image-ref: eclipse-temurin:21-jre-alpine
           format: table
           exit-code: '0'        # warn only — we don't own the base image
@@ -346,12 +347,15 @@ jobs:
           retention-days: 7
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # JOB 5 — Dependency_Scan  (Trivy filesystem / SCA — JFrog Xray equivalent)
-  # Trivy scans the repo's dependency manifests (pom.xml, lockfiles) for known
-  # CVEs on every PR — catching vulnerable dependencies BEFORE an image is built.
-  # Replaces OWASP Dependency-Check: Trivy already runs the base + image scans,
-  # needs no NVD API key, and shares one CVE database across all three stages.
-  # Blocks on HIGH/CRITICAL CVEs that have a fix available.
+  # JOB 5 — Dependency_Scan  (CycloneDX SBOM + Trivy — JFrog Xray equivalent)
+  # A raw `trivy fs` over pom.xml cannot resolve rewabank-bom-managed versions
+  # (BOM dependencyManagement) so it scans incompletely ("version cannot be
+  # determined"). Instead we generate a CycloneDX SBOM via Maven (fully resolved,
+  # runtime deps only) and scan that. Replaces OWASP Dependency-Check: no NVD API
+  # key, one CVE DB shared with the base + image Trivy scans. Runs on PRs so
+  # dependency CVEs are caught before an image is built. Blocks on fixable
+  # HIGH/CRITICAL. A root .trivyignore carries documented no-fix/false-positive
+  # waivers (each with a reason + review date).
   # ═══════════════════════════════════════════════════════════════════════════
   dependency-scan:
     name: Dependency_Scan
@@ -364,23 +368,61 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Trivy — filesystem (dependency) scan
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+      - uses: actions/setup-java@v4
         with:
-          scan-type: fs
-          scan-ref: .
-          format: sarif
-          output: trivy-fs.sarif
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      # Install the BOM modules so aggregate SBOM generation can resolve the
+      # managed dependency versions across every service module.
+      - name: Install BOMs
+        run: mvn -q -pl rewabank-bom,rewabank-bom/common-bom -am install -DskipTests
+
+      # Aggregate CycloneDX SBOM for the whole reactor -> target/bom.json.
+      # includeTestScope=false keeps it to shipped/runtime deps (less noise).
+      - name: Generate CycloneDX SBOM (aggregate, runtime deps)
+        run: >
+          mvn -q org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom
+          -DincludeTestScope=false
+          -DoutputFormat=json
+          -DoutputName=bom
+
+      - name: Upload SBOM artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: target/bom.json
+          retention-days: 30
+
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514  # SHA-pinned (bundled w/ trivy-action v0.36.0)
+        with:
+          version: v0.76.1
+
+      # Human-readable findings in the job log (report-only — never fails here).
+      - name: Trivy SBOM — findings table (report-only)
+        run: trivy sbom target/bom.json --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --format table
+
+      # Blocking gate: fail on fixable HIGH/CRITICAL; SARIF to GitHub Security.
+      # Trivy auto-reads a root .trivyignore for documented waivers.
+      - name: Trivy SBOM — scan (blocking)
+        run: >
+          trivy sbom target/bom.json
+          --scanners vuln
+          --severity HIGH,CRITICAL
+          --ignore-unfixed
+          --exit-code 1
+          --format sarif
+          --output trivy-sbom.sarif
 
       - name: Upload to GitHub Security
         if: always()
         uses: github/codeql-action/upload-sarif@0fda7a646fd14a20daf520829ca1ae8847000819  # codeql-bundle-v2.27.3
         with:
-          sarif_file: trivy-fs.sarif
-          category: trivy-fs
+          sarif_file: trivy-sbom.sarif
+          category: trivy-sbom
 
   # ═══════════════════════════════════════════════════════════════════════════
   # JOB 6 — SCA_Scan  (Snyk Software Composition Analysis)
@@ -564,6 +606,7 @@ jobs:
       - name: Trivy — image scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
+          version: v0.76.1
           image-ref: ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:sha-${{ needs.parse-context.outputs.short_sha }}
           format: sarif
           output: trivy-${{ matrix.service }}.sarif
