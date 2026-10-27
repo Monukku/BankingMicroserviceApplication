@@ -57,9 +57,12 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
-                        // Internal MS-to-MS GET by ID — network-level protected by Istio AuthorizationPolicy (cards-ms-sa)
+                        // GET by UUID: authenticated at the edge; app-layer ownership enforced in
+                        // AccountService.getByIdForCaller (owner / staff / INTERNAL_SERVICE -> 200,
+                        // other customer -> 404). Was permitAll (app-layer IDOR, Istio-only). Istio
+                        // AuthorizationPolicy still applies as network-layer defense-in-depth.
                         .requestMatchers(HttpMethod.GET, "/api/v1/accounts/{id:[0-9a-f-]{36}}")
-                        .permitAll()
+                        .authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/accounts")
                         .hasAnyRole(ROLE_CUSTOMER, ROLE_TELLER, ROLE_BRANCH_MANAGER, ROLE_SUPER_ADMIN)
                         .requestMatchers(HttpMethod.GET, "/api/v1/accounts/**")

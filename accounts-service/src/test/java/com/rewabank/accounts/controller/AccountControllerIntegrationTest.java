@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -144,7 +145,7 @@ class AccountControllerIntegrationTest {
     void getBalance_ShouldReturnBalance() throws Exception {
         BalanceResponse balanceResponse = new BalanceResponse(
                 "123456789012", BigDecimal.valueOf(1500), BigDecimal.valueOf(1500), "INR", "ACTIVE", LocalDateTime.now());
-        when(accountReadService.getBalance("123456789012")).thenReturn(balanceResponse);
+        when(accountReadService.getBalanceForCaller(eq("123456789012"), any())).thenReturn(balanceResponse);
 
         mockMvc.perform(get("/api/v1/accounts/{accountNumber}/balance", "123456789012"))
                 .andExpect(status().isOk())

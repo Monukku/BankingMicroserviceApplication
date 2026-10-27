@@ -10,11 +10,11 @@ public class FilterUtility {
     public static final String CORRELATION_ID = "rewabank-correlation-id";
 
     public String getCorrelationId(HttpHeaders requestHeaders) {
-        if (requestHeaders.get(CORRELATION_ID) != null) {
-            List<String> requestHeadersList = requestHeaders.get(CORRELATION_ID);
-            return requestHeadersList.stream().findFirst().get();
+        List<String> requestHeadersList = requestHeaders.get(CORRELATION_ID);
+        if (requestHeadersList == null) {
+            return null;
         }
-        return null;
+        return requestHeadersList.stream().findFirst().orElse(null);
     }
 
     public ServerWebExchange setRequestHeader(ServerWebExchange exchange, String name, String value) {

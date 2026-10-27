@@ -69,6 +69,18 @@ class AccountServiceTest {
     }
 
     @Test
+    void getByIdForCaller_ShouldThrowAccountException_WhenAccountNotFound() {
+        // Ownership-guarded get-by-id: a missing id must 404 (ACCT_002) before any
+        // ownership check runs — no existence leak.
+        UUID missingId = UUID.randomUUID();
+        when(accountsRepository.findByIdAndDeletedAtIsNull(missingId)).thenReturn(Optional.empty());
+
+        AccountException ex = assertThrows(AccountException.class,
+                () -> accountService.getByIdForCaller(missingId, null));
+        assertEquals("ACCT_002", ex.getErrorCode());
+    }
+
+    @Test
     void createAccount_ShouldCreateAccountSuccessfully() throws JsonProcessingException {
         // Arrange
         when(accountsRepository.findByCustomerIdAndDeletedAtIsNull(customerId))

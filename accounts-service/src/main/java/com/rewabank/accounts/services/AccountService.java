@@ -11,6 +11,7 @@ import com.rewabank.accounts.repository.AccountsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -30,6 +31,7 @@ public class AccountService {
     private final CustomersFeignClient         customersFeignClient;
     private final AccountReadService           accountReadService;
     private final OutboxEventSaver             outboxEventSaver;
+    private final AccountAccessPolicy          accessPolicy;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -465,6 +467,19 @@ public class AccountService {
         return accountRepository.findByIdAndDeletedAtIsNull(id)
                 .map(this::toResponse)
                 .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
+    }
+
+    /**
+     * Ownership-guarded get-by-id for the public GET /{uuid} endpoint.
+     * Owner or a privileged role (staff / INTERNAL_SERVICE) may read; any other
+     * caller gets ACCT_002 (404) — no existence leak. Same non-cached guarded
+     * pattern as AccountReadService.getBalanceForCaller.
+     */
+    public AccountResponse getByIdForCaller(UUID id, Jwt jwt) {
+        Account account = accountRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new AccountException(ERR_CODE_NOT_FOUND, ERR_ACCOUNT_NOT_FOUND));
+        accessPolicy.requireReadAccess(account.getKeycloakUserId(), jwt);
+        return toResponse(account);
     }
 
     public List<AccountResponse> getAccountsByStatus(Account.AccountStatus status) {
