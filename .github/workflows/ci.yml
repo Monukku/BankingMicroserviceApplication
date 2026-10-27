@@ -687,7 +687,9 @@ jobs:
           persist-credentials: false
 
       - name: OpenSSF Scorecard
-        uses: ossf/scorecard-action@v2.3.1
+        # v2.5.0 — image moved to ghcr.io (v2.3.1 used docker://gcr.io/... which now
+        # fails the pull: gcr.io is sunset and its project billing is disabled).
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e  # v2.5.0
         with:
           results_file: scorecard.sarif
           results_format: sarif
