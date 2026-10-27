@@ -1,3 +1,4 @@
+
 # RewaBank — CI/CD Pipeline Documentation
 
 ---
@@ -22,7 +23,7 @@ Parse_Context → Build → Base_Image_Validation → Unit_Tests_SonarQube
 |---|---|---|
 | Unit Tests | Maven Surefire | Same |
 | Code Quality | SonarCloud | SonarQube |
-| Dependency CVE scan | OWASP Dependency Check | JFrog Xray |
+| Dependency CVE scan | Trivy (filesystem / SCA) | JFrog Xray |
 | SCA (license + CVE) | Snyk | Snyk Enterprise |
 | Mutation Testing | PIT (pitest-maven) | Same |
 | SAST | CodeQL | Snyk SAST / Checkmarx |
@@ -45,7 +46,6 @@ Go to: `GitHub repo → Settings → Secrets and variables → Actions → New r
 | `DOCKERHUB_TOKEN` | Docker Hub → Account Settings → Security → New Access Token |
 | `SONAR_TOKEN` | sonarcloud.io → My Account → Security → Generate Token |
 | `SNYK_TOKEN` | snyk.io → Account Settings → Auth Token |
-| `NVD_API_KEY` | nvd.nist.gov → Request API Key → check email |
 
 ---
 
@@ -112,28 +112,7 @@ This is just your Docker Hub username — no token needed.
 
 ---
 
-### 5. NVD_API_KEY
-
-Used by OWASP Dependency Check to download CVE data from the National
-Vulnerability Database (NVD). Without this key, NVD rate-limits requests
-(HTTP 429) when multiple services run in parallel — causing the scan to fail.
-
-1. Go to [nvd.nist.gov/developers/request-an-api-key](https://nvd.nist.gov/developers/request-an-api-key)
-2. Fill in:
-   - **Organization:** your name or `RewaBank`
-   - **Email:** your email address
-   - **Reason:** `Security scanning for open source project`
-3. Click **Request Key**
-4. Check your email — NVD sends the key within a few minutes
-5. Copy the API key from the email
-6. Add as secret `NVD_API_KEY`
-
-> **Free tier:** NVD API keys are completely free with no usage limits for
-> non-commercial use. The key removes rate limiting immediately.
-
----
-
-### 6. Add All Secrets to GitHub
+### 5. Add All Secrets to GitHub
 
 1. Go to `github.com/Monukku/BankingMicroserviceApplication`
 2. Click **Settings** → left menu → **Secrets and variables** → **Actions**
@@ -145,7 +124,6 @@ Vulnerability Database (NVD). Without this key, NVD rate-limits requests
 | `DOCKERHUB_TOKEN` | token from step 2 |
 | `SONAR_TOKEN` | token from step 3 |
 | `SNYK_TOKEN` | token from step 4 |
-| `NVD_API_KEY` | key from step 5 |
 
 > **Note:** Secret names must start with a letter and contain only letters,
 > numbers, and underscores. No spaces.
@@ -160,6 +138,30 @@ Vulnerability Database (NVD). Without this key, NVD rate-limits requests
 | Push to `master` / `main` | All 16 jobs including Docker build + publish + deploy |
 | Pull Request to `master` / `main` | Jobs 1–8 (gate before merge) |
 | Manual (`workflow_dispatch`) | Choose service + optional tag → all 16 jobs |
+
+---
+
+## Branch Protection — Required Status Checks
+
+`master` is the GitOps branch (Argo CD auto-deploys it), so the PR gate matters.
+Configure under `Settings → Branches → Branch protection rules → master →
+Require status checks to pass`.
+
+**Required checks (dependency CVE gate is now Trivy, not OWASP):**
+
+| Check | Blocking? | Notes |
+|---|---|---|
+| `Build — <service>` | ✅ | compile must pass |
+| `Unit_Tests_SonarQube — <service>` | ✅ | tests + SonarCloud quality gate |
+| `Integration_Tests — <service>` | ✅ | Failsafe + Testcontainers |
+| `Dependency_Scan` | ✅ | **Trivy filesystem scan** (single repo-wide job — replaced the per-service OWASP checks) |
+| `SAST_Scan` / `CodeQL` | ✅ | static analysis |
+| `SCA_Scan — <service>` | ➖ | Snyk, `continue-on-error` |
+
+> **Migration note:** the old required checks `Dependency_Scan — <service>`
+> (one per service, OWASP Dependency-Check) no longer exist. Remove them from
+> branch protection and add the single `Dependency_Scan` (Trivy) check instead.
+> The `NVD_API_KEY` secret is no longer used and can be deleted.
 
 ---
 
@@ -253,17 +255,22 @@ the security team even if it doesn't block the build.
 ### JOB 5 — Dependency_Scan
 
 **What it does:**
-- Runs OWASP Dependency Check against each service's `pom.xml`
-- Checks all Maven dependencies against the NVD (National Vulnerability Database)
-- Fails build if any dependency has CVSS score >= 9 (Critical)
-- Uploads HTML + JSON reports as artifacts (kept 30 days)
+- Runs a Trivy **filesystem scan** (`scan-type: fs`) over the whole repo tree
+- Trivy detects every service's `pom.xml` (and any lockfiles) and checks the
+  resolved dependencies against its CVE database
+- `exit-code: 1` + `severity: HIGH,CRITICAL` — blocks the PR on any HIGH or
+  CRITICAL dependency CVE
+- `ignore-unfixed: true` — only flags CVEs that actually have a fix available
+- Uploads SARIF to the GitHub Security tab (category `trivy-fs`)
 
 **Enterprise equivalent:** JFrog Xray dependency scan
 
-**Why CVSS >= 9 threshold:**
-Banks don't block on every CVE — that would stop every build.
-CVSS 9+ means actively exploitable with no authentication required.
-That's the threshold that gets you a regulatory finding from RBI auditors.
+**Why Trivy and not OWASP Dependency-Check:**
+Trivy already runs the base-image and image scans (Jobs 3 + 10), so dependency
+scanning reuses the same engine and CVE database — one tool, no NVD API key to
+manage, and no NVD rate-limit flakiness. It runs on PRs (needs only
+`parse-context`), so vulnerable dependencies are caught *before* an image is
+ever built, not just at image-scan time.
 
 ---
 
@@ -277,9 +284,10 @@ That's the threshold that gets you a regulatory finding from RBI auditors.
 
 **Required secret:** `SNYK_TOKEN`
 
-**Difference from OWASP:**
-OWASP uses NVD database. Snyk uses its own curated database — they catch
-different vulnerabilities. Running both = defense in depth (dual-vendor scanning).
+**Difference from Trivy (Job 5):**
+Trivy (Job 5) uses its own CVE database to scan dependency manifests. Snyk uses
+its own separately-curated database — they catch different vulnerabilities.
+Running both = defense in depth (dual-vendor scanning).
 
 ---
 
@@ -521,19 +529,21 @@ For local dev: pull + apply manually after the pipeline completes.
 **"Walk me through your CI/CD pipeline"**
 
 > "We follow a 16-stage enterprise DevSecOps pipeline. Build and tests run in parallel
-> with a base image scan. We use dual-vendor scanning — OWASP + Snyk for dependencies,
-> Trivy + Snyk for container images — because each vendor's CVE database covers different
+> with a base image scan. We use dual-vendor scanning — Trivy + Snyk for both dependencies
+> and container images — because each vendor's CVE database covers different
 > vulnerabilities. Docker images are built with a SHA tag first, only promoted to latest
 > after all scans pass. After publish, we extract the sha256 digest and pin it in the
 > k8s manifest — so the cluster always runs the exact image that passed security gates,
 > never a floating :latest. Every run ends with a Print_Receipt job for audit trail,
 > which is an RBI compliance requirement."
 
-**"What's the difference between your OWASP scan and Snyk SCA?"**
+**"What's the difference between your Trivy dependency scan and Snyk SCA?"**
 
-> "OWASP uses the NVD database, Snyk uses its own curated database. Running both
-> gives us defense in depth — Snyk catches CVEs that NVD hasn't indexed yet,
-> OWASP catches older CVEs that Snyk may have deprioritised."
+> "Trivy and Snyk each maintain their own CVE database. Running both gives us
+> defense in depth — Snyk catches CVEs Trivy's feed hasn't indexed yet, and Trivy
+> catches ones Snyk may have deprioritised. Trivy also runs the same engine across
+> our dependency, base-image, and image scans, so there's no extra tool or NVD API
+> key to maintain."
 
 **"Why use digest pinning instead of :latest?"**
 
