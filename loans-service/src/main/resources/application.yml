@@ -66,7 +66,7 @@ accounts:
 
 internal:
   call:
-    secret: ${INTERNAL_CALL_SECRET}
+    secret: ${INTERNAL_CALL_SECRET:rewabank-internal-secret}
 
 customers:
   service:

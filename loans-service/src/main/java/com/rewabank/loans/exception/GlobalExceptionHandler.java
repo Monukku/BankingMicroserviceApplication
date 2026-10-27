@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -61,6 +62,20 @@ public class GlobalExceptionHandler {
                 "errorCode",   "LOAN_VALIDATION",
                 "message",     "Validation failed",
                 "fieldErrors", errors
+        ));
+    }
+
+    // Non-UUID path vars / invalid enum values must be 400, not the catch-all 500.
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex, WebRequest request) {
+        log.warn("Invalid request parameter: {}", ex.getMessage());
+        return ResponseEntity.badRequest().body(Map.of(
+                "timestamp", LocalDateTime.now().toString(),
+                "status",    400,
+                "errorCode", "LOAN_400",
+                "message",   "Invalid value for parameter '" + ex.getName() + "'",
+                "path",      request.getDescription(false).replace("uri=", "")
         ));
     }
 

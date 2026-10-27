@@ -9,6 +9,7 @@ import com.rewabank.customers.exception.CustomerException;
 import com.rewabank.customers.kafka.CustomerEventProducer;
 import com.rewabank.customers.repository.AddressRepository;
 import com.rewabank.customers.repository.CustomerRepository;
+import com.rewabank.customers.repository.KycDocumentRepository;
 import com.rewabank.customers.util.EncryptionUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,7 @@ class KycServiceTest {
     @Mock CustomerService    customerService;
     @Mock CustomerEventProducer eventProducer;
     @Mock EncryptionUtil     encryptionUtil;
+    @Mock KycDocumentRepository kycDocumentRepository;
 
     @InjectMocks KycService kycService;
 
@@ -74,6 +76,7 @@ class KycServiceTest {
         when(encryptionUtil.encrypt(anyString())).thenReturn("encrypted");
         when(addressRepository.findByCustomerId(customerId)).thenReturn(List.of());
         when(addressRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(kycDocumentRepository.existsByCustomerIdAndDocumentType(any(), any())).thenReturn(true);
 
         kycService.submitKyc("kc-user-1", submitRequest());
 
@@ -92,6 +95,7 @@ class KycServiceTest {
         when(encryptionUtil.encrypt(anyString())).thenReturn("encrypted");
         when(addressRepository.findByCustomerId(customerId)).thenReturn(List.of());
         when(addressRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(kycDocumentRepository.existsByCustomerIdAndDocumentType(any(), any())).thenReturn(true);
 
         assertThatCode(() -> kycService.submitKyc("kc-user-1", submitRequest()))
                 .doesNotThrowAnyException();
@@ -150,6 +154,7 @@ class KycServiceTest {
         when(encryptionUtil.encrypt(anyString())).thenReturn("encrypted");
         when(addressRepository.findByCustomerId(customerId)).thenReturn(List.of(existing));
         when(addressRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(kycDocumentRepository.existsByCustomerIdAndDocumentType(any(), any())).thenReturn(true);
 
         kycService.submitKyc("kc-user-1", submitRequest());
 

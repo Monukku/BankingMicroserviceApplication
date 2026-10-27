@@ -239,8 +239,8 @@ public class CardTransactionService {
      */
     private boolean isThisMonth(LocalDateTime dateTime) {
         LocalDateTime now = LocalDateTime.now();
-        return dateTime.getYear() == now.getYear() && 
-               dateTime.getMonth() == now.getMonth();
+        return dateTime.getYear() == now.getYear() &&
+               dateTime.getMonth().equals(now.getMonth());
     }
 
     /**
