@@ -67,7 +67,7 @@ public class EmiCalculatorService {
             schedule.add(EmiSchedule.builder()
                     .loanId(loanId)
                     .installmentNumber(i)
-                    .dueDate(firstEmiDate.plusMonths(i - 1))
+                    .dueDate(firstEmiDate.plusMonths(i - 1L))
                     .emiAmount(actualEmi.setScale(2, RoundingMode.HALF_UP))
                     .principalPart(principal_.setScale(2, RoundingMode.HALF_UP))
                     .interestPart(interest)

@@ -281,7 +281,7 @@ public class DepositService {
         double     years        = fd.getTenureMonths() / 12.0;
         double     maturityAmt  = principal.doubleValue()
                 * Math.pow(1 + annualRate.doubleValue() / 4, 4 * years);
-        BigDecimal maturityAmount = new BigDecimal(maturityAmt)
+        BigDecimal maturityAmount = BigDecimal.valueOf(maturityAmt)
                 .setScale(4, RoundingMode.HALF_UP);
         BigDecimal interest = maturityAmount.subtract(principal);
 
@@ -413,7 +413,7 @@ public class DepositService {
         double maturityAmt  = rd.getInstallmentAmount().doubleValue()
                 * (Math.pow(1 + monthlyRate, rd.getTenureMonths()) - 1)
                 / monthlyRate * (1 + monthlyRate);
-        BigDecimal maturityAmount = new BigDecimal(maturityAmt)
+        BigDecimal maturityAmount = BigDecimal.valueOf(maturityAmt)
                 .setScale(4, RoundingMode.HALF_UP);
 
         // Pay to source account

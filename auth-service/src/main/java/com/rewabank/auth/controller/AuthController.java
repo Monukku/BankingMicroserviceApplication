@@ -237,10 +237,10 @@ public class AuthController {
         String email    = body.get("email");
         String fullName = body.get("fullName");
         String role     = body.get("role");
-        String password = body.getOrDefault("password", "RewaBank@2024!");
+        String password = body.get("password");
 
-        if (email == null || fullName == null || role == null)
-            throw new AuthException("AUTH_004", "email, fullName and role are required");
+        if (email == null || fullName == null || role == null || password == null || password.isBlank())
+            throw new AuthException("AUTH_004", "email, fullName, role and password are required");
         if (!STAFF_ROLES.contains(role))
             throw new AuthException("AUTH_004", "Invalid staff role: " + role);
 
