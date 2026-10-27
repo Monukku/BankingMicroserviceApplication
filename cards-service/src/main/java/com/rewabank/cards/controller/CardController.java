@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -49,9 +50,8 @@ public class CardController {
     @Operation(summary = "Get card by ID")
     public ResponseEntity<CardResponse> getById(
             @PathVariable UUID id,
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication auth) {
-        boolean isStaff = isStaffCaller(auth);
+            @AuthenticationPrincipal Jwt jwt) {
+        boolean isStaff = isStaffCaller();
         if (isStaff) {
             // Staff can view any card
             return ResponseEntity.ok(cardService.getByIdForStaff(id));
@@ -66,9 +66,8 @@ public class CardController {
     public ResponseEntity<CardResponse> blockCard(
             @PathVariable UUID id,
             @RequestBody(required = false) CardBlockRequest request,
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication auth) {
-        boolean isStaff = isStaffCaller(auth);
+            @AuthenticationPrincipal Jwt jwt) {
+        boolean isStaff = isStaffCaller();
         CardBlockRequest req = request != null ? request : new CardBlockRequest(null, null);
         return ResponseEntity.ok(cardService.blockCard(id, jwt.getSubject(), req, isStaff));
     }
@@ -78,10 +77,9 @@ public class CardController {
     @Operation(summary = "Unblock card")
     public ResponseEntity<CardResponse> unblockCard(
             @PathVariable UUID id,
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication auth) {
+            @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(
-                cardService.unblockCard(id, jwt.getSubject(), isStaffCaller(auth)));
+                cardService.unblockCard(id, jwt.getSubject(), isStaffCaller()));
     }
 
     // ── Staff: activate PENDING card (Teller hands card to customer) ──────────
@@ -141,7 +139,11 @@ public class CardController {
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
-    private boolean isStaffCaller(Authentication auth) {
+    private boolean isStaffCaller() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            return false;   // unauthenticated / no security context → not staff (never NPE)
+        }
         return auth.getAuthorities().stream().anyMatch(a -> {
             String r = a.getAuthority();
             return r.equals("ROLE_TELLER") || r.equals("ROLE_BRANCH_MANAGER")
