@@ -1,0 +1,20 @@
+# RewaBank — Trivy vulnerability waivers
+#
+# Each waiver below is a HIGH/CRITICAL finding with NO fix available on the
+# current Spring Boot 3.5.x line. Format: CVE, affected library, reason, review-by.
+# Re-review every 30 days — remove the waiver once a compatible fix ships.
+
+# --- Spring Framework WebMVC / WebFlux (spring-webmvc, spring-webflux 6.2.19) ---
+# No fix in the 6.2.x line; fixed only in Spring Framework 7.0.9, which requires
+# Spring Boot 4.x. Deferred to the Boot 4.x evaluation (see PR follow-ups).
+# review-by: 2026-11-26
+CVE-2026-47884
+CVE-2026-47890
+CVE-2026-47892
+
+# --- Keycloak (keycloak-core 24.0.3) ---
+# Fix requires a major upgrade keycloak 24 -> 26.0.6 (admin-client API changes).
+# Tracked separately as a follow-up (keycloak 26 upgrade). Not a runtime-exposed
+# path in auth-service's usage, but waived pending the dedicated upgrade.
+# review-by: 2026-11-26
+CVE-2024-10039

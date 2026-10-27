@@ -8,7 +8,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.4.3</version>
+		<version>3.5.16</version>
 		<relativePath/>
 	</parent>
 
@@ -23,9 +23,19 @@
 		<java.version>21</java.version>
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
-		<spring-boot.version>3.4.3</spring-boot.version>
-		<spring-cloud.version>2024.0.1</spring-cloud.version>
-		<springdoc.version>2.5.0</springdoc.version>
+		<spring-boot.version>3.5.16</spring-boot.version>
+		<spring-cloud.version>2025.0.3</spring-cloud.version>
+		<springdoc.version>2.8.6</springdoc.version>
+
+		<!-- Security overrides: pin vulnerable transitive deps above Boot 3.5.16's
+		     managed versions (fixes Trivy HIGH/CRITICAL that Boot has not yet shipped).
+		     These are direct version properties in spring-boot-dependencies, so a
+		     property override reaches them. jackson + netty are managed via sub-BOMs
+		     imported inside spring-boot-dependencies and are overridden with explicit
+		     BOM imports below instead. CVEs with no 3.5.x fix are waived in .trivyignore. -->
+		<tomcat.version>10.1.61</tomcat.version>
+		<postgresql.version>42.7.14</postgresql.version>
+		<httpcore5.version>5.4.4</httpcore5.version>
 		<lombok.version>1.18.36</lombok.version>
 		<testcontainers.version>1.19.8</testcontainers.version>
 		<jjwt.version>0.12.3</jjwt.version>
@@ -46,6 +56,25 @@
 
 	<dependencyManagement>
 		<dependencies>
+
+			<!-- Security override BOMs — declared BEFORE spring-boot-dependencies so
+			     these win (first import wins). jackson + netty are managed via sub-BOMs
+			     inside spring-boot-dependencies that a property override cannot reach;
+			     importing the patched BOMs here pins all of their artifacts together. -->
+			<dependency>
+				<groupId>com.fasterxml.jackson</groupId>
+				<artifactId>jackson-bom</artifactId>
+				<version>2.21.8</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>io.netty</groupId>
+				<artifactId>netty-bom</artifactId>
+				<version>4.1.139.Final</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
 
 			<!-- Spring Boot BOM -->
 			<dependency>
@@ -129,6 +158,24 @@
 				<version>${bucket4j.version}</version>
 			</dependency>
 
+			<!-- Security overrides for transitive deps NOT managed by a Boot version
+			     property. Pins above the vulnerable versions Boot 3.5.16 pulls in. -->
+			<dependency>
+				<groupId>commons-io</groupId>
+				<artifactId>commons-io</artifactId>
+				<version>2.19.0</version>
+			</dependency>
+			<dependency>
+				<groupId>at.yawk.lz4</groupId>
+				<artifactId>lz4-java</artifactId>
+				<version>1.11.4</version>
+			</dependency>
+			<dependency>
+				<groupId>org.bouncycastle</groupId>
+				<artifactId>bcprov-jdk18on</artifactId>
+				<version>1.86</version>
+			</dependency>
+
 		</dependencies>
 	</dependencyManagement>
 
@@ -160,7 +207,7 @@
 						<dependency>
 							<groupId>org.pitest</groupId>
 							<artifactId>pitest-junit5-plugin</artifactId>
-							<version>1.2.1</version>
+							<version>1.2.3</version>
 						</dependency>
 					</dependencies>
 				</plugin>
