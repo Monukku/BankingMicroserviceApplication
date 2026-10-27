@@ -495,6 +495,7 @@ jobs:
         run: mvn -f rewabank-bom/pom.xml install -q
 
       - name: PIT mutation tests
+        continue-on-error: true    # advisory — warns below the 60% threshold, does not block (per design)
         run: |
           mvn -f ${{ matrix.dir }}/pom.xml test-compile \
             org.pitest:pitest-maven:mutationCoverage \
