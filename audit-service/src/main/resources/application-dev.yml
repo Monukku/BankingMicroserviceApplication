@@ -1,0 +1,30 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## audit-ms — DEV profile (local development).
+## Activate with: -Dspring.profiles.active=dev
+## ─────────────────────────────────────────────────────────────────────────────
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/audit_db}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8080/auth/realms/rewabank/protocol/openid-connect/certs}
+
+management:
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_ENDPOINT:http://localhost:4318/v1/traces}
+
+logging:
+  level:
+    com.rewabank: DEBUG
+    org.springframework.kafka: INFO

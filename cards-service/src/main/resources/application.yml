@@ -1,3 +1,9 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## cards-ms — COMMON base config (profile-independent).
+## Environment-specific endpoints/credentials live in application-{dev,prod}.yml.
+## Active profile defaults to `prod`; override with SPRING_PROFILES_ACTIVE or
+## -Dspring.profiles.active=dev for local development.
+## ─────────────────────────────────────────────────────────────────────────────
 server:
   port: 8092
   error:
@@ -7,6 +13,8 @@ server:
 spring:
   application:
     name: cards-ms
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:prod}
   cloud:
     openfeign:
       circuitbreaker:
@@ -15,9 +23,6 @@ spring:
           enabled: true   # CB instance name = @FeignClient name (e.g. fraud-ms), not full method signature
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/cards_db}
-    username: ${DB_USERNAME:cards_user}
-    password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
@@ -37,7 +42,6 @@ spring:
     locations: classpath:db/migration
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-kafka-bootstrap.banking.svc.cluster.local:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -54,23 +58,6 @@ spring:
         spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
 
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          jwk-set-uri: ${KEYCLOAK_JWKS_URI}
-          issuer-uri: ${KEYCLOAK_ISSUER_URI}
-
-feign:
-  customers-ms:
-    url: ${CUSTOMERS_SERVICE_URL:http://customers-service.banking.svc.cluster.local:8080}
-  accounts-ms:
-    url: ${ACCOUNTS_SERVICE_URL:http://accounts-service.banking.svc.cluster.local:8081}
-  fraud-ms:
-    url: ${FRAUD_SERVICE_URL:http://fraud-service.banking.svc.cluster.local:8094}
-  notification-ms:
-    url: ${NOTIFICATIONS_SERVICE_URL:http://notifications-service.banking.svc.cluster.local:9010}
-
 encryption:
   aes-key: ${AES_ENCRYPTION_KEY}
 
@@ -81,30 +68,6 @@ kafka:
   consumer:
     groups:
       fraud: ${KAFKA_CARDS_FRAUD_GROUP:cards-ms-fraud}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus
-  endpoint:
-    health:
-      show-details: always
-      probes:
-        enabled: true
-  metrics:
-    tags:
-      application: ${spring.application.name}
-    export:
-      prometheus:
-        enabled: true
-
-  tracing:
-    sampling:
-      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
-  otlp:
-    tracing:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
 
 resilience4j:
   circuitbreaker:
@@ -123,14 +86,24 @@ card:
   cvv:
     bcrypt-strength: 5   # 2^5=32 iterations — fast for CVV verification on every transaction
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+
 logging:
-  level:
-    com.rewabank: INFO
   pattern:
     level: "%5p[${spring.application.name},%X{traceId},%X{spanId}]"
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"
-springdoc:
-  api-docs:
-    enabled: ${SWAGGER_ENABLED:false}
-  swagger-ui:
-    enabled: ${SWAGGER_ENABLED:false}

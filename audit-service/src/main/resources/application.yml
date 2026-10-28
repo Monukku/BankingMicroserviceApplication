@@ -1,3 +1,9 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## audit-ms — COMMON base config (profile-independent).
+## Environment-specific endpoints/credentials live in application-{dev,prod}.yml.
+## Active profile defaults to `prod`; override with SPRING_PROFILES_ACTIVE or
+## -Dspring.profiles.active=dev for local development.
+## ─────────────────────────────────────────────────────────────────────────────
 server:
   port: 9011
   error:
@@ -7,14 +13,14 @@ server:
 spring:
   application:
     name: audit-ms
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:prod}
 
   data:
     mongodb:
-      uri: ${MONGODB_URI}
       auto-index-creation: true
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-kafka-bootstrap.banking.svc.cluster.local:9092}
     consumer:
       group-id: ${KAFKA_CONSUMER_GROUP:audit-ms}
       auto-offset-reset: earliest
@@ -25,12 +31,6 @@ spring:
       properties:
         spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs}
 
 management:
   endpoints:
@@ -48,19 +48,11 @@ management:
     export:
       prometheus:
         enabled: true
-  tracing:
-    sampling:
-      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
-  otlp:
-    tracing:
-      endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
 
 logging:
-  level:
-    com.rewabank: INFO
-    org.springframework.kafka: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{rewabank-correlation-id}] [%X{traceId}] %-5level %logger{36} - %msg%n"
+
 springdoc:
   api-docs:
     enabled: ${SWAGGER_ENABLED:false}

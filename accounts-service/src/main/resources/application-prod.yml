@@ -1,0 +1,49 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## accounts-ms — PROD profile (cloud managed services).
+## ─────────────────────────────────────────────────────────────────────────────
+spring:
+  datasource:
+    url:      ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  data:
+    redis:
+      host:     ${REDIS_HOST:valkey.banking.svc.cluster.local}
+      port:     ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      timeout:  2s
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-kafka-bootstrap.banking.svc.cluster.local:9092}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri:  ${KEYCLOAK_ISSUER_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs}
+
+customers:
+  service:
+    url: ${CUSTOMERS_SERVICE_URL:http://customers-service.banking.svc.cluster.local:8080}
+
+management:
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
+
+logging:
+  level:
+    com.rewabank: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO

@@ -1,0 +1,58 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## customers-ms — DEV profile (local development).
+## Defaults point at localhost so a developer can run the service without
+## exporting env vars. Override any value (e.g. point at a cloud free tier)
+## by setting the matching env var. Secrets still come from env — no real
+## credentials are committed here.
+## Activate with: -Dspring.profiles.active=dev  (or SPRING_PROFILES_ACTIVE=dev)
+## ─────────────────────────────────────────────────────────────────────────────
+spring:
+  datasource:
+    url:      ${DB_URL:jdbc:postgresql://localhost:5432/customers_db}
+    username: ${DB_USERNAME:customers_user}
+    password: ${DB_PASSWORD:customers_pass}
+
+  jpa:
+    show-sql: true
+
+  data:
+    redis:
+      host:     ${REDIS_HOST:localhost}
+      port:     ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout:  2s
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/auth/realms/rewabank}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8080/auth/realms/rewabank/protocol/openid-connect/certs}
+
+s3:
+  endpoint:   ${S3_ENDPOINT:http://localhost:9000}
+  access-key: ${S3_ACCESS_KEY:minioadmin}
+  secret-key: ${S3_SECRET_KEY:minioadmin}
+
+management:
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_ENDPOINT:http://localhost:4318/v1/traces}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+
+logging:
+  level:
+    com.rewabank: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG

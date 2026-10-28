@@ -1,3 +1,9 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## api-gateway — COMMON base config (profile-independent).
+## Environment-specific endpoints/credentials live in application-{dev,prod}.yml.
+## Active profile defaults to `prod`; override with SPRING_PROFILES_ACTIVE or
+## -Dspring.profiles.active=dev for local development.
+## ─────────────────────────────────────────────────────────────────────────────
 server:
   port: 8072
   error:
@@ -7,30 +13,11 @@ server:
 spring:
   application:
     name: api-gateway
-
-  # ← CHANGED: removed config.import: configserver
-  # Config comes from K8s ConfigMap mounted at /config/application.yml
-
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          # ← CHANGED: K8s DNS — keycloak service in keycloak namespace
-          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs}
-          issuer-uri:  ${KEYCLOAK_ISSUER_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank}
-
-  data:
-    redis:
-      # ← CHANGED: K8s DNS
-      host: ${REDIS_HOST:valkey.banking.svc.cluster.local}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD}   # injected from K8s Secret
-      connect-timeout: 5s
-      timeout: 5s
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:prod}
 
   cloud:
     gateway:
-      # ← REMOVED: discovery.locator (was Eureka) — using explicit K8s DNS routes
       httpclient:
         connect-timeout: 1000
         # Global backstop — must be >= the largest per-route circuit-breaker time-limiter
@@ -50,12 +37,6 @@ rate-limiting:
   auth:
     capacity: 5                    # 10 req/min per IP — login + register
     refill-period-seconds: 60
-
-# CORS — override per environment via K8s ConfigMap
-cors:
-  allowed-origins:
-    - ${CORS_ORIGIN_WEB:http://localhost:4200}
-    - ${CORS_ORIGIN_MOBILE:http://localhost:3000}
 
 # Resilience4j circuit breakers
 resilience4j:
@@ -148,27 +129,11 @@ management:
     export:
       prometheus:
         enabled: true
-  tracing:
-    sampling:
-      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
-  otlp:
-    tracing:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
 
 logging:
-  level:
-    com.rewabank: INFO
-    org.springframework.cloud.gateway: INFO
-    org.springframework.security: INFO
   pattern:
     level: "%5p[${spring.application.name},%X{traceId},%X{spanId}]"
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{rewabank-correlation-id}] [%X{traceId}] %-5level %logger{36} - %msg%n"
-
-springdoc:
-  api-docs:
-    enabled: ${SWAGGER_ENABLED:false}
-  swagger-ui:
-    enabled: ${SWAGGER_ENABLED:false}
 
 info:
   app:

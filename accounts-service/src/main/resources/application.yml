@@ -1,3 +1,9 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## accounts-ms — COMMON base config (profile-independent).
+## Environment-specific endpoints/credentials live in application-{dev,prod}.yml.
+## Active profile defaults to `prod`; override with SPRING_PROFILES_ACTIVE or
+## -Dspring.profiles.active=dev for local development.
+## ─────────────────────────────────────────────────────────────────────────────
 server:
   port: 8081
   error:
@@ -7,14 +13,14 @@ server:
 spring:
   application:
     name: accounts-ms
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:prod}
   cloud:
     openfeign:
       circuitbreaker:
         enabled: true
+
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
@@ -23,6 +29,7 @@ spring:
       connection-timeout: 2000
       idle-timeout: 600000
       keepalive-time: 30000
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -33,17 +40,12 @@ spring:
         jdbc:
           lob:
             non_contextual_creation: true
+
   flyway:
     enabled: true
     locations: classpath:db/migration
-  data:
-    redis:
-      host: ${REDIS_HOST:valkey.banking.svc.cluster.local}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD}
-      timeout: 2s
+
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-kafka-bootstrap.banking.svc.cluster.local:9092}
     consumer:
       group-id: ${KAFKA_CONSUMER_GROUP:accounts-ms}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -54,12 +56,6 @@ spring:
       properties:
         spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank}
-          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs}
 
 kafka:
   topics:
@@ -70,10 +66,6 @@ kafka:
     account-frozen:    bank.account.frozen
     account-closed:    bank.account.closed
     balance-updated:   bank.balance.updated
-
-customers:
-  service:
-    url: ${CUSTOMERS_SERVICE_URL:http://customers-service.banking.svc.cluster.local:8080}
 
 internal:
   call:
@@ -110,23 +102,7 @@ management:
     export:
       prometheus:
         enabled: true
-  tracing:
-    sampling:
-      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
-  otlp:
-    tracing:
-      endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
-
-springdoc:
-  api-docs:
-    enabled: ${SWAGGER_ENABLED:false}
-  swagger-ui:
-    enabled: ${SWAGGER_ENABLED:false}
 
 logging:
-  level:
-    com.rewabank: INFO
-    org.springframework.security: INFO
-    org.hibernate.SQL: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{rewabank-correlation-id}] [%X{traceId}] %-5level %logger{36} - %msg%n"

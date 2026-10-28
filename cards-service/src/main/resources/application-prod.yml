@@ -1,0 +1,46 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## cards-ms — PROD profile (cloud managed services).
+## ─────────────────────────────────────────────────────────────────────────────
+spring:
+  datasource:
+    url:      ${DB_URL:jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/cards_db}
+    username: ${DB_USERNAME:cards_user}
+    password: ${DB_PASSWORD}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-kafka-bootstrap.banking.svc.cluster.local:9092}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI}
+          issuer-uri:  ${KEYCLOAK_ISSUER_URI}
+
+feign:
+  customers-ms:
+    url: ${CUSTOMERS_SERVICE_URL:http://customers-service.banking.svc.cluster.local:8080}
+  accounts-ms:
+    url: ${ACCOUNTS_SERVICE_URL:http://accounts-service.banking.svc.cluster.local:8081}
+  fraud-ms:
+    url: ${FRAUD_SERVICE_URL:http://fraud-service.banking.svc.cluster.local:8094}
+  notification-ms:
+    url: ${NOTIFICATIONS_SERVICE_URL:http://notifications-service.banking.svc.cluster.local:9010}
+
+management:
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
+
+logging:
+  level:
+    com.rewabank: INFO

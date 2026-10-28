@@ -23,6 +23,7 @@
         <module>transactions-service</module>
         <module>fraud-service</module>
         <module>notifications-service</module>
+        <module>payments-service</module>
         <module>api-gateway</module>
     </modules>
 
