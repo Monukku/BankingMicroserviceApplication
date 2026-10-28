@@ -1,0 +1,45 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## api-gateway — DEV profile (local development).
+## Defaults point at localhost; override any value via env var.
+## Activate with: -Dspring.profiles.active=dev
+## ─────────────────────────────────────────────────────────────────────────────
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8080/auth/realms/rewabank/protocol/openid-connect/certs}
+          issuer-uri:  ${KEYCLOAK_ISSUER_URI:http://localhost:8080/auth/realms/rewabank}
+
+  data:
+    redis:
+      host:            ${REDIS_HOST:localhost}
+      port:            ${REDIS_PORT:6379}
+      password:        ${REDIS_PASSWORD:}
+      connect-timeout: 5s
+      timeout:         5s
+
+cors:
+  allowed-origins:
+    - ${CORS_ORIGIN_WEB:http://localhost:4200}
+    - ${CORS_ORIGIN_MOBILE:http://localhost:3000}
+
+management:
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+
+logging:
+  level:
+    com.rewabank: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.security: DEBUG

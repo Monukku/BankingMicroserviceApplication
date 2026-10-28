@@ -1,0 +1,47 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## payments-service — DEV profile (local development).
+## Activate with: -Dspring.profiles.active=dev
+## ─────────────────────────────────────────────────────────────────────────────
+spring:
+  datasource:
+    url:      ${DB_URL:jdbc:postgresql://localhost:5432/payments_db}
+    username: ${DB_USERNAME:payments_user}
+    password: ${DB_PASSWORD:payments_pass}
+
+  jpa:
+    show-sql: true
+
+  data:
+    redis:
+      host:            ${REDIS_HOST:localhost}
+      port:            ${REDIS_PORT:6379}
+      password:        ${REDIS_PASSWORD:}
+      connect-timeout: 5s
+      timeout:         5s
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8080/auth/realms/rewabank/protocol/openid-connect/certs}
+          issuer-uri:  ${KEYCLOAK_ISSUER_URI:http://localhost:8080/auth/realms/rewabank}
+
+accounts:
+  service:
+    url: ${ACCOUNTS_SERVICE_URL:http://localhost:8081}
+
+management:
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+logging:
+  level:
+    com.rewabank: DEBUG
+    org.springframework.security: DEBUG

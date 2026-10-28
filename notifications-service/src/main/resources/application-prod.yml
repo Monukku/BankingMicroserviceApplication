@@ -1,0 +1,31 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## notifications-ms — PROD profile (cloud managed services).
+## MongoDB targets Atlas via MONGODB_URI (injected from Secret).
+## ─────────────────────────────────────────────────────────────────────────────
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_URI}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-kafka-bootstrap.banking.svc.cluster.local:9092}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri:  ${KEYCLOAK_ISSUER_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak-keycloakx-http.keycloak.svc.cluster.local:80/auth/realms/rewabank/protocol/openid-connect/certs}
+
+management:
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING_PROBABILITY:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_ENDPOINT:http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces}
+
+logging:
+  level:
+    com.rewabank: INFO
+    org.springframework.kafka: INFO
