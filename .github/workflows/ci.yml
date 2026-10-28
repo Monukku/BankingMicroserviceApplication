@@ -34,12 +34,26 @@ on:
         default: ''
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Workflow permissions — least privilege.
+# security-events: write is REQUIRED by github/codeql-action/upload-sarif
+# (Image_Scan / Container_Scan / CodeQL). Without it the SARIF upload fails with
+# "Resource not accessible by integration" and fails the job.
+# ─────────────────────────────────────────────────────────────────────────────
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Global env — override per job if needed
 # ─────────────────────────────────────────────────────────────────────────────
 env:
   JAVA_VERSION: '21'
   REGISTRY: docker.io
   IMAGE_PREFIX: rewabank
+  # Pull the Trivy vuln DB from ghcr instead of the default gcr.io mirror, which
+  # this repo has hit pull/rate-limit issues with (see the scorecard gcr.io fix).
+  TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
