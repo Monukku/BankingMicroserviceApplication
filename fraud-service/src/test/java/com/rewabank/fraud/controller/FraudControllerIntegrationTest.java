@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rewabank.fraud.model.FraudAlert;
 import com.rewabank.fraud.service.FraudAlertService;
 import com.rewabank.fraud.service.FraudScoringService;
-import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +13,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -43,7 +43,10 @@ class FraudControllerIntegrationTest {
     @SuppressWarnings("deprecation") @MockBean FraudScoringService           fraudScoringService;
     @SuppressWarnings("deprecation") @MockBean FraudAlertService             fraudAlertService;
     @SuppressWarnings("deprecation") @MockBean RedisTemplate<String, Object> redisTemplate;
-    @SuppressWarnings("deprecation") @MockBean MeterRegistry                 meterRegistry;
+    @SuppressWarnings("deprecation") @MockBean KafkaTemplate<String, Object> kafkaTemplate;
+    // No @MockBean MeterRegistry: a bare mock's more() returns null and breaks
+    // TaskExecutorMetricsAutoConfiguration at startup. Boot's real SimpleMeterRegistry
+    // is used instead (as in FraudControllerSecurityTest).
 
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final UUID ALERT_ID   = UUID.randomUUID();

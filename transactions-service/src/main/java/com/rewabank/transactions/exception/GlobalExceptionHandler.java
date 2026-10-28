@@ -3,11 +3,16 @@ package com.rewabank.transactions.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -66,6 +71,51 @@ public class GlobalExceptionHandler {
                 "errorCode",   "TXN_VALIDATION",
                 "message",     "Validation failed",
                 "fieldErrors", errors
+        ));
+    }
+
+    // @PreAuthorize / method-security denials. With the servlet filter chain
+    // disabled (addFilters=false) there is no ExceptionTranslationFilter to turn
+    // this into a 403, so it must be mapped here — otherwise it falls through to 500.
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthorizationDenied(
+            AuthorizationDeniedException ex, WebRequest request) {
+        log.warn("Access denied: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "timestamp", LocalDateTime.now().toString(),
+                "status",    HttpStatus.FORBIDDEN.value(),
+                "errorCode", "TXN_FORBIDDEN",
+                "message",   "Access denied"
+        ));
+    }
+
+    // Missing required header (e.g. X-Idempotency-Key absent), malformed path
+    // variable (e.g. non-UUID id), or unreadable body → 400, not 500.
+    @ExceptionHandler({
+            MissingRequestHeaderException.class,
+            MethodArgumentTypeMismatchException.class,
+            HttpMessageNotReadableException.class
+    })
+    public ResponseEntity<Map<String, Object>> handleBadRequest(
+            Exception ex, WebRequest request) {
+        log.warn("Bad request: {}", ex.getMessage());
+        return ResponseEntity.badRequest().body(Map.of(
+                "timestamp", LocalDateTime.now().toString(),
+                "status",    HttpStatus.BAD_REQUEST.value(),
+                "errorCode", "TXN_VALIDATION",
+                "message",   "Invalid request"
+        ));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException ex, WebRequest request) {
+        log.warn("Unsupported media type: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(Map.of(
+                "timestamp", LocalDateTime.now().toString(),
+                "status",    HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(),
+                "errorCode", "TXN_UNSUPPORTED_MEDIA_TYPE",
+                "message",   "Unsupported media type"
         ));
     }
 
