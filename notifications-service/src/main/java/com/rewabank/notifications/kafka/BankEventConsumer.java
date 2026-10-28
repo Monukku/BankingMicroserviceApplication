@@ -183,7 +183,10 @@ public class BankEventConsumer {
 
     private void process(Map<String, Object> event, Acknowledgment ack) {
         try {
-            String eventType = (String) event.getOrDefault("eventType", "UNKNOWN");
+            // Coerce defensively — a malformed payload may carry a non-String
+            // eventType (e.g. number/boolean); a hard cast would crash the consumer.
+            Object rawType = event.getOrDefault("eventType", "UNKNOWN");
+            String eventType = rawType != null ? String.valueOf(rawType) : "UNKNOWN";
             log.debug("Processing notification for event: {}", eventType);
             notificationService.processEvent(event);
             ack.acknowledge();  // manual ACK only on success
