@@ -2,6 +2,7 @@ package com.rewabank.transactions.controller;
 
 import com.rewabank.transactions.dto.TransactionResponse;
 import com.rewabank.transactions.dto.TransferRequest;
+import com.rewabank.transactions.exception.TransactionException;
 import com.rewabank.transactions.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,9 +35,18 @@ public class TransactionController {
     @Operation(summary = "Initiate a money transfer")
     public ResponseEntity<TransactionResponse> transfer(
             @Valid @RequestBody TransferRequest request,
-            @RequestHeader("X-Idempotency-Key") String idempotencyKey,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal Jwt jwt,
             HttpServletRequest httpRequest) {
+
+        // X-Idempotency-Key is mandatory and must be a safe token (no blanks, no
+        // control chars / header-injection). Reject early with 400 rather than
+        // letting a bad key reach Redis / the saga.
+        if (idempotencyKey == null || idempotencyKey.isBlank()
+                || !idempotencyKey.matches("^[A-Za-z0-9._-]{1,128}$")) {
+            throw new TransactionException("TXN_VALIDATION",
+                    "X-Idempotency-Key header is required and must be a valid token");
+        }
 
         String userRole = extractPrimaryRole(jwt);
         String ipAddress = httpRequest.getRemoteAddr();

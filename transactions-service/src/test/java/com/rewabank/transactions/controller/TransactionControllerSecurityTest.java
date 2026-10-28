@@ -12,11 +12,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -24,12 +24,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Negative / security tests for TransactionController.
- * Covers: missing idempotency key, unauthenticated access, role-based access
- * control violations, IDOR prevention, and malformed input rejection.
+ * Bean-validation / input-rejection tests for TransactionController.
+ *
+ * Runs with the security filter chain OFF (addFilters = false) so that
+ * request-level authorization (SecurityConfig's hasAnyRole rules) does not
+ * short-circuit to 403 before the controller's validation runs — these tests
+ * assert the 400/415 input-handling contract. Role-based 401/403/200 checks
+ * live in {@link TransactionControllerAuthorizationTest}, which keeps filters
+ * ON; the two concerns need opposite filter settings, hence the split.
  */
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 class TransactionControllerSecurityTest {
 
@@ -67,59 +72,6 @@ class TransactionControllerSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validTransfer())))
                 .andExpect(status().isBadRequest());
-    }
-
-    // ── Rule: Unauthenticated requests must be rejected ──────────────────────
-
-    @Test
-    void transfer_Returns401_WhenUnauthenticated() throws Exception {
-        mockMvc.perform(post("/api/v1/transactions/transfer")
-                        .header("X-Idempotency-Key", UUID.randomUUID().toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validTransfer())))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void getMyTransactions_Returns401_WhenUnauthenticated() throws Exception {
-        mockMvc.perform(get("/api/v1/transactions"))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void getById_Returns401_WhenUnauthenticated() throws Exception {
-        mockMvc.perform(get("/api/v1/transactions/{id}", UUID.randomUUID()))
-                .andExpect(status().isUnauthorized());
-    }
-
-    // ── Rule: Staff-only endpoints must reject CUSTOMER role ─────────────────
-
-    @Test
-    void getAllTransactions_Returns403_WhenCustomerRole() throws Exception {
-        mockMvc.perform(get("/api/v1/transactions/all")
-                        .with(jwt().authorities(
-                                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CUSTOMER"))))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void reverse_Returns403_WhenCustomerRole() throws Exception {
-        mockMvc.perform(post("/api/v1/transactions/{id}/reverse", UUID.randomUUID())
-                        .with(jwt().authorities(
-                                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CUSTOMER")))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"test\"}"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void reverse_Returns403_WhenTellerRole() throws Exception {
-        mockMvc.perform(post("/api/v1/transactions/{id}/reverse", UUID.randomUUID())
-                        .with(jwt().authorities(
-                                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_TELLER")))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"test\"}"))
-                .andExpect(status().isForbidden());
     }
 
     // ── Rule: Request body validation — missing required fields ──────────────
@@ -176,8 +128,7 @@ class TransactionControllerSecurityTest {
     @Test
     void reverse_Returns400_WhenIdIsNotUuid() throws Exception {
         mockMvc.perform(post("/api/v1/transactions/{id}/reverse", "not-a-uuid")
-                        .with(jwt().authorities(
-                                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_BRANCH_MANAGER")))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BRANCH_MANAGER")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"test\"}"))
                 .andExpect(status().isBadRequest());
@@ -205,29 +156,5 @@ class TransactionControllerSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validTransfer())))
                 .andExpect(status().isBadRequest());
-    }
-
-    // ── Rule: BRANCH_MANAGER can access staff endpoints ──────────────────────
-
-    @Test
-    void getAllTransactions_Returns200_WhenBranchManager() throws Exception {
-        org.mockito.Mockito.when(transactionService.getAllTransactions(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(org.springframework.data.domain.Page.empty());
-
-        mockMvc.perform(get("/api/v1/transactions/all")
-                        .with(jwt().authorities(
-                                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_BRANCH_MANAGER"))))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void getAllTransactions_Returns200_WhenSuperAdmin() throws Exception {
-        org.mockito.Mockito.when(transactionService.getAllTransactions(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(org.springframework.data.domain.Page.empty());
-
-        mockMvc.perform(get("/api/v1/transactions/all")
-                        .with(jwt().authorities(
-                                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))))
-                .andExpect(status().isOk());
     }
 }

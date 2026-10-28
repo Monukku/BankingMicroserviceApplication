@@ -1,5 +1,7 @@
 package com.rewabank.transactions.service;
 
+import com.rewabank.transactions.client.AccountsFeignClient;
+import com.rewabank.transactions.dto.AccountInfoResponse;
 import com.rewabank.transactions.dto.TransactionResponse;
 import com.rewabank.transactions.dto.TransferRequest;
 import com.rewabank.transactions.entity.Beneficiary;
@@ -39,6 +41,7 @@ class TransactionServiceTest {
     @Mock private IdempotencyService    idempotencyService;
     @Mock private LimitService          limitService;
     @Mock private TransferSaga          transferSaga;
+    @Mock private AccountsFeignClient   accountsClient;
 
     @InjectMocks private TransactionService transactionService;
 
@@ -80,6 +83,14 @@ class TransactionServiceTest {
                 .findByKeycloakUserIdAndBeneficiaryAccountNumberAndDeletedAtIsNull(any(), any()))
                 .thenReturn(Optional.empty());
         when(transferSaga.execute(any(), any())).thenReturn(completedTxn);
+
+        // transfer() verifies source-account ownership and resolves the destination
+        // account via the accounts service before the saga runs — both must be stubbed
+        // (ACTIVE, source owned by USER_ID) or the real call NPEs and surfaces as TXN_500.
+        when(accountsClient.getById(sourceId))
+                .thenReturn(new AccountInfoResponse(sourceId, "111111111111", USER_ID, "ACTIVE"));
+        when(accountsClient.lookupByAccountNumber("222222222222"))
+                .thenReturn(new AccountInfoResponse(destId, "222222222222", "dest-user-002", "ACTIVE"));
     }
 
     // ── transfer: happy path ──────────────────────────────────────────────────

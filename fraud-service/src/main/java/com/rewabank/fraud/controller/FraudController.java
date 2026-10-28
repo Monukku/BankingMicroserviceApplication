@@ -1,5 +1,6 @@
 package com.rewabank.fraud.controller;
 
+import com.rewabank.fraud.exception.FraudException;
 import com.rewabank.fraud.model.FraudAlert;
 import com.rewabank.fraud.service.FraudAlertService;
 import com.rewabank.fraud.service.FraudScoringService;
@@ -40,6 +41,12 @@ public class FraudController {
             @RequestParam BigDecimal amount,
             @RequestParam String transactionType,
             @RequestParam String correlationId) {
+
+        // Reject non-positive amounts up front (400) rather than scoring them.
+        if (amount == null || amount.signum() <= 0) {
+            throw new FraudException("FRAUD_VALIDATION",
+                    "amount must be a positive value");
+        }
 
         FraudScoringService.ScoringResult result =
                 fraudScoringService.score(accountId, amount,
