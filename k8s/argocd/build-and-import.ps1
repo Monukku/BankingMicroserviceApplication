@@ -39,7 +39,7 @@ $deployMap = @{
 }
 if (-not $deployMap.ContainsKey($Service)) { throw "Unknown service '$Service'. One of: $($deployMap.Keys -join ', ')" }
 $deploy = $deployMap[$Service]
-$image  = "rewabank/$Service:latest"
+$image  = "rewabank/${Service}:latest"   # ${Service} braces required: "$Service:latest" parses ':latest' as a PS scope qualifier
 $dir    = Join-Path $root $Service
 
 function Step($m){ Write-Host "`n[$Service] $m" -ForegroundColor Cyan }
