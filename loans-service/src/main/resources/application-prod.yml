@@ -3,7 +3,7 @@
 ## ─────────────────────────────────────────────────────────────────────────────
 spring:
   datasource:
-    url:      ${DB_URL:jdbc:postgresql://postgresql-rw.banking.svc.cluster.local:5432/loans_db}
+    url:      ${DB_URL}   # prod must supply DB_URL (cloud Postgres, e.g. Neon); no in-cluster fallback
     username: ${DB_USERNAME:loans_user}
     password: ${DB_PASSWORD}
 

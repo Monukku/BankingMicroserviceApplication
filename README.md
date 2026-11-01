@@ -94,9 +94,8 @@ kubectl get namespace banking keycloak --show-labels
 ## STEP 4 — Add Helm Repos
 
 ```powershell
-helm repo add cnpg        https://cloudnative-pg.github.io/charts
+# Postgres (Neon) and MongoDB (Atlas) are cloud-managed — no operator Helm repos needed.
 helm repo add strimzi     https://strimzi.io/charts/
-helm repo add mongodb     https://mongodb.github.io/helm-charts
 helm repo add codecentric https://codecentric.github.io/helm-charts
 helm repo update
 ```
@@ -105,47 +104,19 @@ helm repo update
 
 ## STEP 5 — Deploy Infrastructure
 
-### 5.1 PostgreSQL (CloudNativePG)
+### 5.1 PostgreSQL (Neon — cloud managed)
 
-```powershell
-helm install cnpg cnpg/cloudnative-pg --namespace cnpg-system --create-namespace
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cloudnative-pg -n cnpg-system --timeout=120s
+PostgreSQL is **cloud-managed on [Neon](https://neon.tech)**, not deployed in-cluster. Each
+service gets a `DB_URL` (+ `DB_USERNAME`/`DB_PASSWORD`) injected via its ConfigMap/Secret
+(see `k8s/apps/*.yaml`, e.g. `jdbc:postgresql://<endpoint>.neon.tech:5432/accounts_db?sslmode=require`).
 
-kubectl create secret generic postgresql-secret --namespace banking --from-literal=username=postgres --from-literal=password=rewabank@2024
+1. Create a Neon project and one database per service (`auth_db`, `customers_db`, `accounts_db`,
+   `transactions_db`, `fraud_db`, `payments_db`, `audit_db`, `keycloak_db`).
+2. Put the pooled connection endpoint in each service's `DB_URL` (ConfigMap) and the password in
+   the `*-db-secret` Secret. Schema is created by Flyway on startup (`ddl-auto: validate`).
 
-kubectl apply -f k8s\postgres-cluster.yaml
-kubectl wait --for=condition=ready pod -l cnpg.io/cluster=postgresql -n banking --timeout=300s
-
-$PG_POD = kubectl get pod -n banking -l cnpg.io/cluster=postgresql -o jsonpath='{.items[0].metadata.name}'
-Write-Host "Using pod: $PG_POD"
-```
-
-Create databases:
-```powershell
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -c "CREATE DATABASE auth_db;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -c "CREATE DATABASE customers_db;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -c "CREATE DATABASE accounts_db;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -c "CREATE DATABASE transactions_db;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -c "CREATE DATABASE fraud_db;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -c "CREATE DATABASE audit_db;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -c "CREATE DATABASE keycloak_db;"
-```
-
-Create users and grant privileges:
-```powershell
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -c "CREATE USER auth_user WITH PASSWORD 'auth@2024'; CREATE USER customers_user WITH PASSWORD 'customers@2024'; CREATE USER accounts_user WITH PASSWORD 'accounts@2024'; CREATE USER transactions_user WITH PASSWORD 'transactions@2024'; CREATE USER fraud_user WITH PASSWORD 'fraud@2024'; CREATE USER audit_user WITH PASSWORD 'audit@2024'; CREATE USER keycloak_user WITH PASSWORD 'keycloak@2024'; GRANT ALL PRIVILEGES ON DATABASE auth_db TO auth_user; GRANT ALL PRIVILEGES ON DATABASE customers_db TO customers_user; GRANT ALL PRIVILEGES ON DATABASE accounts_db TO accounts_user; GRANT ALL PRIVILEGES ON DATABASE transactions_db TO transactions_user; GRANT ALL PRIVILEGES ON DATABASE fraud_db TO fraud_user; GRANT ALL PRIVILEGES ON DATABASE audit_db TO audit_user; GRANT ALL PRIVILEGES ON DATABASE keycloak_db TO keycloak_user;"
-```
-
-Grant schema permissions:
-```powershell
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -d auth_db -c "GRANT ALL ON SCHEMA public TO auth_user;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -d customers_db -c "GRANT ALL ON SCHEMA public TO customers_user;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -d accounts_db -c "GRANT ALL ON SCHEMA public TO accounts_user;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -d transactions_db -c "GRANT ALL ON SCHEMA public TO transactions_user;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -d fraud_db -c "GRANT ALL ON SCHEMA public TO fraud_user;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -d audit_db -c "GRANT ALL ON SCHEMA public TO audit_user;"
-kubectl exec -it $PG_POD -n banking -- psql -U postgres -d keycloak_db -c "GRANT ALL ON SCHEMA public TO keycloak_user;"
-```
+> The old in-cluster CloudNativePG setup is preserved at `k8s/legacy/postgres-cluster.yaml`
+> for offline/local-only use. It is no longer part of the standard deploy.
 
 ### 5.2 Valkey (Redis)
 
@@ -170,18 +141,23 @@ kubectl apply -f k8s\kafka-cluster.yaml
 kubectl wait kafka/kafka --for=condition=Ready --timeout=300s -n banking
 ```
 
-### 5.4 MongoDB
+### 5.4 MongoDB (Atlas — cloud managed)
 
-> **Important:** Create the `mongodb-secret` BEFORE applying the cluster — the operator needs it on first reconcile.
+MongoDB is **cloud-managed on [MongoDB Atlas](https://www.mongodb.com/atlas)**, used by
+`notifications-ms` and `audit-ms`. Each gets a `MONGODB_URI` injected from the
+`mongodb-atlas-secret` Secret (DB `notifications_db` / `audit_db`).
 
 ```powershell
-helm install mongodb-operator mongodb/community-operator --namespace banking
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=mongodb-kubernetes-operator -n banking --timeout=120s
-
-kubectl create secret generic mongodb-secret --namespace banking --from-literal=password=mongodb@2024
-kubectl apply -f k8s\mongodb-cluster.yaml
-kubectl wait --for=condition=ready pod -l app=mongodb-svc -n banking --timeout=300s
+# One Atlas cluster, SRV URI per service DB, stored in a K8s Secret:
+kubectl create secret generic mongodb-atlas-secret --namespace banking `
+  --from-literal=notifications-uri='mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/notifications_db?retryWrites=true&w=majority' `
+  --from-literal=audit-uri='mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/audit_db?retryWrites=true&w=majority'
 ```
+
+> Add your cluster's egress IP to the Atlas **Network Access** allow-list (residential IPs
+> rotate — a dropped match causes TLS `internal_error` crash-loops). Seed notification
+> templates with `k8s/seed-notification-templates.js` (see that file's header).
+> The old in-cluster operator setup is preserved at `k8s/legacy/mongodb-cluster.yaml`.
 
 ### 5.5 Keycloak
 
@@ -474,11 +450,11 @@ Credentials:
   Valkey (Redis):    redis@2024
   MongoDB:           mongodb@2024 (user: root)
 
-Internal DNS (no :80 — Keycloak drops default port from JWT iss):
-  PostgreSQL:  postgresql-rw.banking.svc.cluster.local:5432
-  Valkey:      valkey.banking.svc.cluster.local:6379
-  Kafka:       kafka-kafka-bootstrap.banking.svc.cluster.local:9092
-  MongoDB:     mongodb-svc.banking.svc.cluster.local:27017
+Endpoints (no :80 — Keycloak drops default port from JWT iss):
+  PostgreSQL:  Neon (cloud)  — per-service DB_URL Secret (…neon.tech:5432, sslmode=require)
+  MongoDB:     Atlas (cloud) — MONGODB_URI Secret (…mongodb.net/<db>)
+  Valkey:      valkey.banking.svc.cluster.local:6379            (in-cluster)
+  Kafka:       kafka-kafka-bootstrap.banking.svc.cluster.local:9092  (in-cluster)
   Keycloak:    keycloak-keycloakx-http.keycloak.svc.cluster.local  (no :80)
 ```
 

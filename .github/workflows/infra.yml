@@ -19,10 +19,9 @@ on:
   push:
     branches: [ "master", "main" ]
     paths:
-      - 'k8s/postgres-cluster.yaml'
+      # Postgres (Neon) and MongoDB (Atlas) are cloud-managed — no in-cluster manifests.
       - 'k8s/kafka-cluster.yaml'
       - 'k8s/valkey.yaml'
-      - 'k8s/mongodb-cluster.yaml'
       - 'k8s/mtls-strict.yaml'
       - 'k8s/istio/**'
 
@@ -65,11 +64,8 @@ jobs:
       - name: Apply mTLS policy
         run: kubectl apply -f k8s/mtls-strict.yaml
 
-      - name: Apply PostgreSQL cluster
-        run: |
-          kubectl apply -f k8s/postgres-cluster.yaml
-          echo "⏳ Waiting for PostgreSQL..."
-          kubectl wait --for=condition=ready pod -l cnpg.io/cluster=postgresql -n banking --timeout=300s
+      # PostgreSQL is now Neon (cloud) and MongoDB is Atlas (cloud) — injected into
+      # services via DB_URL / MONGODB_URI Secrets, not deployed in-cluster.
 
       - name: Apply Kafka cluster
         run: |
@@ -82,15 +78,9 @@ jobs:
           kubectl apply -f k8s/valkey.yaml
           kubectl wait --for=condition=ready pod -l app=valkey -n banking --timeout=120s
 
-      - name: Apply MongoDB
-        run: |
-          kubectl apply -f k8s/mongodb-cluster.yaml
-          kubectl wait --for=condition=ready pod -l app=mongodb-svc -n banking --timeout=300s
-
       - name: Infrastructure summary
         run: |
           echo "=============================="
           echo "  INFRA SUMMARY"
           echo "=============================="
           kubectl get pods -n banking
-          kubectl get pods -n cnpg-system

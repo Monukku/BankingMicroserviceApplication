@@ -1,11 +1,24 @@
-// MongoDB seed script — run once against the notifications DB
-// Usage (from inside the cluster or after port-forwarding MongoDB):
-//   mongosh "mongodb://mongodb-svc.banking.svc.cluster.local:27017/notifications" seed-notification-templates.js
+
+// MongoDB seed script — run once against the notifications DB.
+// The connection (and therefore the target DB) comes from the mongosh connection
+// string, NOT hardcoded — so this works against MongoDB Atlas (prod) exactly as
+// the service does. Do NOT re-add a connect() here; prod uses Atlas, not the old
+// in-cluster mongodb-svc.
 //
-// Re-running is safe: upsert on eventType (unique index)
+// Usage — run against whatever MONGODB_URI the service uses (Atlas in prod). The
+// URI already contains the DB name (prod: /notifications_db), so pass it straight:
+//
+//   # From a throwaway pod (default ns — avoids the banking-ns istio injector):
+//   URI=$(kubectl get secret mongodb-atlas-secret -n banking -o jsonpath='{.data.notifications-uri}' | base64 -d)
+//   kubectl run mongo-seed --rm -i --restart=Never -n default --image=mongo:7 \
+//     --command -- sh -c "mongosh '$URI'" < k8s/seed-notification-templates.js
+//
+//   # Or locally (requires mongosh + your IP in the Atlas access list):
+//   mongosh "$MONGODB_URI" seed-notification-templates.js
+//
+// Re-running is safe: upsert on eventType (unique index).
 
-const db = connect("mongodb://mongodb-svc.banking.svc.cluster.local:27017/notifications");
-
+// Use the DB from the connection string (e.g. Atlas .../notifications_db).
 const now = new Date();
 
 const templates = [
