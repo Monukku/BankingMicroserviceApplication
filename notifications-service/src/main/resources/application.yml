@@ -27,9 +27,11 @@ spring:
       enable-auto-commit: false
       max-poll-records: ${KAFKA_MAX_POLL_RECORDS:50}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      # ErrorHandlingDeserializer -> tolerant EventMapDeserializer (handles both a JSON
+      # object and the Outbox's double-encoded JSON string, routes bad records to DLQ).
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
-        spring.json.trusted.packages: "com.rewabank,java.util,java.time,java.math"
+        spring.deserializer.value.delegate.class: com.rewabank.notifications.kafka.EventMapDeserializer
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
 
 # ── Notification provider config ─────────────────────────────────────────────
