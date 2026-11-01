@@ -25,7 +25,7 @@ metadata:
   labels:
     app: audit-ms
 spec:
-  replicas: 1
+  replicas: 0   # parked at 0 to free local RAM; HPA removed below so this holds. Set to 1 + restore HPA to re-enable (Kafka retains events, audit catches up).
   selector:
     matchLabels:
       app: audit-ms
@@ -92,26 +92,9 @@ spec:
       port: 9011
       targetPort: 9011
   type: ClusterIP
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: audit-ms-hpa
-  namespace: banking
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: audit-ms
-  minReplicas: 1
-  maxReplicas: 1
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
+# NOTE: HorizontalPodAutoscaler removed — it had minReplicas:1, which would
+# override replicas:0 above and scale audit-ms back up. Restore it (git history)
+# together with replicas:1 when re-enabling audit-ms.
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
