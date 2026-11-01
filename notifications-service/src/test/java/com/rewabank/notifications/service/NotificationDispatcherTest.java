@@ -52,4 +52,25 @@ class NotificationDispatcherTest {
     void sendSms_emptyMessage_doesNotThrow() {
         assertThat(dispatcher.sendSms("9876543210", "")).isTrue();
     }
+
+    @Test
+    void sendEmail_resendProvider_missingApiKey_returnsFalse() {
+        // Real delivery requested via Resend, but no API key configured:
+        // must fail (false), NOT fall through to the log-only default and return true.
+        ReflectionTestUtils.setField(dispatcher, "simulationMode", false);
+        ReflectionTestUtils.setField(dispatcher, "emailProvider", "resend");
+        ReflectionTestUtils.setField(dispatcher, "resendApiKey", "");
+        assertThat(dispatcher.sendEmail("rewa@rewabank.com", "Subject", "Body")).isFalse();
+    }
+
+    @Test
+    void sendEmail_resendProvider_blowsUpGracefully_returnsFalse() {
+        // Key present but delivery will fail (no network/invalid key in unit test):
+        // exception must be swallowed and surfaced as false, never thrown.
+        ReflectionTestUtils.setField(dispatcher, "simulationMode", false);
+        ReflectionTestUtils.setField(dispatcher, "emailProvider", "resend");
+        ReflectionTestUtils.setField(dispatcher, "resendApiKey", "re_test_invalid");
+        ReflectionTestUtils.setField(dispatcher, "emailFromAddress", "noreply@rewabank.com");
+        assertThat(dispatcher.sendEmail("rewa@rewabank.com", "Subject", "Body")).isFalse();
+    }
 }

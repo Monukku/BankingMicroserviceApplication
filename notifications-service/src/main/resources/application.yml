@@ -55,9 +55,10 @@ notification:
     twilio-auth-token: ${TWILIO_AUTH_TOKEN:}
     twilio-from-number: ${TWILIO_FROM_NUMBER:}
   email:
-    provider: ${EMAIL_PROVIDER:log}         # log | smtp | aws-ses | sendgrid
+    provider: ${EMAIL_PROVIDER:log}         # log | resend | smtp | aws-ses | sendgrid
     from-address: ${EMAIL_FROM:noreply@rewabank.com}
     sendgrid-api-key: ${SENDGRID_API_KEY:}
+    resend-api-key: ${RESEND_API_KEY:}
   push:
     provider: ${PUSH_PROVIDER:log}          # log | fcm
     fcm-server-key: ${FCM_SERVER_KEY:}

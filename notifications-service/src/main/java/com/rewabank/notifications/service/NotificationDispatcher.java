@@ -14,7 +14,7 @@ import java.util.Map;
  *
  * Provider wiring:
  *   SMS   — set SMS_PROVIDER=twilio | aws-sns + supply credentials
- *   Email — set EMAIL_PROVIDER=smtp | aws-ses | sendgrid + supply credentials
+ *   Email — set EMAIL_PROVIDER=resend | sendgrid | smtp | aws-ses + supply credentials
  *   Push  — set PUSH_PROVIDER=fcm + supply FCM_SERVER_KEY
  *
  * NOTIFICATION_SIMULATION_MODE=true (default) — logs only, no real delivery.
@@ -47,6 +47,9 @@ public class NotificationDispatcher {
 
     @Value("${notification.email.sendgrid-api-key:}")
     private String sendgridApiKey;
+
+    @Value("${notification.email.resend-api-key:}")
+    private String resendApiKey;
 
     @Value("${notification.push.provider:log}")
     private String pushProvider;
@@ -86,6 +89,7 @@ public class NotificationDispatcher {
         }
         try {
             return switch (emailProvider.toLowerCase()) {
+                case "resend"   -> sendViaResend(email, subject, body);
                 case "sendgrid" -> sendViaSendGrid(email, subject, body);
                 case "smtp"     -> sendViaSmtp(email, subject, body);
                 case "aws-ses"  -> sendViaAwsSes(email, subject, body);
@@ -196,6 +200,37 @@ public class NotificationDispatcher {
 
         boolean ok = response.getStatusCode().is2xxSuccessful();
         log.info("FCM push to user {} — {}", userId, response.getStatusCode());
+        return ok;
+    }
+
+    private boolean sendViaResend(String to, String subject, String body) {
+        if (resendApiKey.isBlank()) {
+            log.error("Resend API key not configured — set RESEND_API_KEY");
+            return false;
+        }
+        // Resend expects `to` as an array and a verified sender domain
+        // (or onboarding@resend.dev for testing). https://resend.com/docs/api-reference/emails
+        Map<String, Object> payload = Map.of(
+                "from", emailFromAddress,
+                "to", List.of(to),
+                "subject", subject,
+                "text", body
+        );
+
+        RestClient client = RestClient.builder()
+                .baseUrl("https://api.resend.com")
+                .defaultHeader("Authorization", "Bearer " + resendApiKey)
+                .build();
+
+        var response = client.post()
+                .uri("/emails")
+                .header("Content-Type", "application/json")
+                .body(payload)
+                .retrieve()
+                .toBodilessEntity();
+
+        boolean ok = response.getStatusCode().is2xxSuccessful();
+        log.info("Resend email to {} — {}", maskEmail(to), response.getStatusCode());
         return ok;
     }
 
