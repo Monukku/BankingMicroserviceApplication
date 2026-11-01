@@ -49,7 +49,7 @@ spec:
       serviceAccountName: notifications-ms-sa
       containers:
         - name: notifications-ms
-          image: rewabank/notifications-service:latest
+          image: rewabank/notifications-service@sha256:a26d2fea823a26fda80d520cba5281f438dbeda284e8ad896eee957601af9a28
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9010
