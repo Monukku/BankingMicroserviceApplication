@@ -45,6 +45,11 @@ spec:
         version: v1
       annotations:
         sidecar.istio.io/inject: "true"
+        # Wait for the Envoy sidecar to be ready before starting the app container,
+        # so the rate-limiter's Redis connect at startup doesn't race DNS/iptables
+        # (previously crash-looped the gateway at 1/2 with "<unresolved>").
+        proxy.istio.io/config: |
+          { "holdApplicationUntilProxyStarts": true }
         prometheus.io/scrape: "true"
         prometheus.io/port: "8072"
         prometheus.io/path: "/actuator/prometheus"
