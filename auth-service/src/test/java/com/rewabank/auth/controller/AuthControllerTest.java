@@ -117,6 +117,42 @@ class AuthControllerTest {
     }
 
     @Test
+    void getCurrentUser_derivesNameFromDbFullName_withoutCallingKeycloak() {
+        // The hot read path must NOT make a synchronous Keycloak Admin API call
+        // (that was the load-test bottleneck). firstName/lastName are derived from
+        // the local fullName, which PATCH /me keeps in sync.
+        BankingUser user = stubUser("9876543210");
+        when(user.getFullName()).thenReturn("Jane Doe");
+        when(bankingUserRepository.findByKeycloakUserIdAndDeletedAtIsNull("kc-1"))
+                .thenReturn(Optional.of(user));
+
+        ResponseEntity<?> response = controller.getCurrentUser(mockJwt("kc-1"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        assertThat(body.get("fullName")).isEqualTo("Jane Doe");
+        assertThat(body.get("firstName")).isEqualTo("Jane");
+        assertThat(body.get("lastName")).isEqualTo("Doe");
+        verifyNoInteractions(keycloak);
+    }
+
+    @Test
+    void getCurrentUser_singleWordName_lastNameBlank() {
+        BankingUser user = stubUser("9876543210");
+        when(user.getFullName()).thenReturn("Madonna");
+        when(bankingUserRepository.findByKeycloakUserIdAndDeletedAtIsNull("kc-1"))
+                .thenReturn(Optional.of(user));
+
+        ResponseEntity<?> response = controller.getCurrentUser(mockJwt("kc-1"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        assertThat(body.get("firstName")).isEqualTo("Madonna");
+        assertThat(body.get("lastName")).isEqualTo("");
+        verifyNoInteractions(keycloak);
+    }
+
+    @Test
     void getCurrentUser_notFound_throwsAuthException() {
         when(bankingUserRepository.findByKeycloakUserIdAndDeletedAtIsNull("unknown"))
                 .thenReturn(Optional.empty());
