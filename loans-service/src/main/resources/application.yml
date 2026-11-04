@@ -29,6 +29,11 @@ spring:
       # 3s (was 30s): fail internally inside the 10s Istio Backend VS.
       connection-timeout: 3000
       keepalive-time: 30000
+      # Neon's serverless pooler drops idle connections server-side (~5 min). Recycle
+      # before that (idle-timeout < max-lifetime) so load never hits a stale
+      # "connection has been closed" validation failure.
+      max-lifetime: 240000
+      idle-timeout: 180000
 
   jpa:
     hibernate:
