@@ -49,7 +49,7 @@ spec:
       serviceAccountName: auth-ms-sa
       containers:
         - name: auth-ms
-          image: rewabank/auth-service:latest
+          image: rewabank/auth-service@sha256:5fbfce55af1974ff8ced2555d3ee91b87ff725318778412e358aafbbdc7014cd
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8073
