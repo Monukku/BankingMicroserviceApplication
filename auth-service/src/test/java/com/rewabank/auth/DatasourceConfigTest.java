@@ -34,4 +34,20 @@ class DatasourceConfigTest {
         int poolSize = Integer.parseInt(prod().getProperty("spring.datasource.hikari.maximum-pool-size"));
         assertThat(poolSize).isGreaterThanOrEqualTo(10);
     }
+
+    @Test
+    void hikariMaxLifetime_recyclesBeforeNeonIdleCutoff() {
+        // Neon's serverless pooler drops idle connections server-side (~5 min). Hikari must
+        // recycle connections BEFORE that, or load hits stale "connection has been closed"
+        // validation failures (observed in the load test).
+        long maxLifetime = Long.parseLong(prod().getProperty("spring.datasource.hikari.max-lifetime"));
+        assertThat(maxLifetime).isPositive().isLessThanOrEqualTo(300_000L);
+    }
+
+    @Test
+    void hikariKeepalive_proactivelyTestsIdleConnections_underMaxLifetime() {
+        long keepalive   = Long.parseLong(prod().getProperty("spring.datasource.hikari.keepalive-time"));
+        long maxLifetime = Long.parseLong(prod().getProperty("spring.datasource.hikari.max-lifetime"));
+        assertThat(keepalive).isPositive().isLessThan(maxLifetime);
+    }
 }

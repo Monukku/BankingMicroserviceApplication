@@ -24,7 +24,13 @@ spring:
       # 3s (was 30s): a DB-connection wait must finish well inside the service's Istio
       # Backend VS (10s) so we fail internally before Istio cuts the request.
       connection-timeout: 3000
-      idle-timeout: 600000
+      # Neon's serverless pooler drops idle connections server-side (~5 min). Recycle
+      # well before that (4 min) and proactively ping idle connections (2 min) so load
+      # never hits a stale "connection has been closed" validation failure. idle-timeout
+      # sits under max-lifetime so Hikari doesn't disable it.
+      max-lifetime: 240000
+      keepalive-time: 120000
+      idle-timeout: 180000
 
   jpa:
     hibernate:

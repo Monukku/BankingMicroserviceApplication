@@ -138,12 +138,13 @@ public class AuthController {
                 .findByKeycloakUserIdAndDeletedAtIsNull(keycloakUserId)
                 .orElseThrow(() -> new AuthException("AUTH_003", "User not found"));
 
-        // Read first/last name from Keycloak so edits via PATCH /me are reflected immediately
-        UserRepresentation kcUser = keycloak.realm(realm).users().get(keycloakUserId).toRepresentation();
-        String firstName = kcUser != null && kcUser.getFirstName() != null ? kcUser.getFirstName() : "";
-        String lastName  = kcUser != null && kcUser.getLastName()  != null ? kcUser.getLastName()  : "";
-        String fullName  = (firstName + " " + lastName).trim();
-        if (fullName.isEmpty()) fullName = user.getFullName();
+        // Name comes from the local banking_users row — PATCH /me keeps it in sync with
+        // Keycloak — so this hot read path makes NO synchronous Keycloak Admin API call
+        // (that per-request admin round-trip was the load-test bottleneck → 504s).
+        String fullName  = user.getFullName() != null ? user.getFullName().trim() : "";
+        int sep          = fullName.indexOf(' ');
+        String firstName = sep < 0 ? fullName : fullName.substring(0, sep);
+        String lastName  = sep < 0 ? ""       : fullName.substring(sep + 1).trim();
 
         Map<String, Object> response = new HashMap<>();
         response.put("userId", user.getId());
