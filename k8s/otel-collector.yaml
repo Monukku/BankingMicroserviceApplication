@@ -17,12 +17,19 @@ data:
     exporters:
       debug:
         verbosity: basic
+      # Grafana Cloud OTLP gateway (ap-south-1). Auth header is injected from the
+      # grafana-cloud-otlp Secret via the GRAFANA_OTLP_AUTH_HEADER env var so the
+      # token is never committed to git. Endpoint posts to .../otlp/v1/traces.
+      otlphttp/grafana:
+        endpoint: https://otlp-gateway-prod-ap-south-1.grafana.net/otlp
+        headers:
+          Authorization: "${env:GRAFANA_OTLP_AUTH_HEADER}"
     service:
       pipelines:
         traces:
           receivers: [otlp]
           processors: [batch]
-          exporters: [debug]
+          exporters: [debug, otlphttp/grafana]
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -43,6 +50,16 @@ spec:
       - name: otel-collector
         image: otel/opentelemetry-collector:0.96.0
         args: ["--config=/etc/otel/config.yaml"]
+        env:
+        # Full "Basic base64(instanceID:token)" header for Grafana Cloud OTLP.
+        # Secret created out-of-band (kubectl), never committed:
+        #   kubectl create secret generic grafana-cloud-otlp -n monitoring \
+        #     --from-literal=auth-header="Basic <base64(instanceID:token)>"
+        - name: GRAFANA_OTLP_AUTH_HEADER
+          valueFrom:
+            secretKeyRef:
+              name: grafana-cloud-otlp
+              key: auth-header
         ports:
         - containerPort: 4317
         - containerPort: 4318
