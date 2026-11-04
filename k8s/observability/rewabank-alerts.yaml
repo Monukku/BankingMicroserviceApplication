@@ -1,0 +1,61 @@
+# RewaBank SLO alert rules — Grafana Cloud Mimir ruler.
+#
+# Mimir ruler expects a SINGLE rule group (name + rules); the namespace goes in the
+# URL path, NOT in a wrapper. Load with an access-policy token scoped `rules:write`
+# (GC labels it `rules:write`, not `metrics:rules:write`):
+#
+#   curl -u '<mimir-user>:<RULES_TOKEN>' -H 'Content-Type: application/yaml' \
+#     -X POST --data-binary @rewabank-alerts.yaml \
+#     https://prometheus-prod-43-prod-ap-south-1.grafana.net/api/prom/rules/rewabank
+#
+# (namespace = "rewabank" in the path; a 202 is success. GET-verify needs `rules:read`.)
+name: rewabank-slo
+rules:
+  # Heap exhaustion — JVM heap over 85% for 5m.
+  - alert: HighHeapUsage
+    expr: |
+      sum by (application) (jvm_memory_used_bytes{area="heap"})
+        / sum by (application) (jvm_memory_max_bytes{area="heap"}) > 0.85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High JVM heap usage on {{ $labels.application }}"
+      description: "Heap > 85% for 5m on {{ $labels.application }}."
+
+  # Error budget — 5xx rate over 5% for 5m (Micrometer http_server_requests).
+  - alert: HighErrorRate
+    expr: |
+      sum by (application) (rate(http_server_requests_seconds_count{outcome="SERVER_ERROR"}[5m]))
+        / sum by (application) (rate(http_server_requests_seconds_count[5m])) > 0.05
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High 5xx error rate on {{ $labels.application }}"
+      description: "Server-error ratio > 5% for 5m on {{ $labels.application }}."
+
+  # Latency — p95 request duration over 1s for 5m. Apps have no Micrometer
+  # http_server_requests_seconds_bucket (percentile-histogram disabled), so p95
+  # comes from the Istio destination histogram.
+  - alert: HighP95Latency
+    expr: |
+      histogram_quantile(0.95,
+        sum by (destination_canonical_service, le) (
+          rate(istio_request_duration_milliseconds_bucket{reporter="destination"}[5m]))) > 1000
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High p95 latency on {{ $labels.destination_canonical_service }}"
+      description: "Istio p95 request duration > 1000ms for 5m."
+
+  # Kafka consumer lag — max lag over 1000 for 5m (payments/fraud/audit/notifications).
+  - alert: KafkaConsumerLag
+    expr: max by (application) (kafka_consumer_fetch_manager_records_lag_max) > 1000
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Kafka consumer lag on {{ $labels.application }}"
+      description: "Consumer records-lag-max > 1000 for 5m on {{ $labels.application }}."

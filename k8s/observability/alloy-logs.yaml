@@ -1,0 +1,167 @@
+# Grafana Alloy — log shipping DaemonSet (banking namespace → Grafana Cloud Loki).
+# Tails app container stdout (skips istio-proxy), drops DEBUG/TRACE, pushes to Loki.
+#
+# Loki credentials are NOT in this file. Create the Secret out-of-band (kept out of git):
+#   kubectl create secret generic loki-cloud-creds -n monitoring \
+#     --from-literal=url='https://logs-prod-028.grafana.net/loki/api/v1/push' \
+#     --from-literal=username='<loki-user-id>' \
+#     --from-literal=password='<logs:write token>'
+#
+# NOTE: loki.source.kubernetes tails via the kube API pods/log subresource, so the
+# ClusterRole MUST include "pods/log" (not just "pods") or every tailer logs
+# "forbidden ... pods/log".
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alloy-logs
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alloy-logs
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/proxy", "nodes/metrics", "pods", "pods/log", "endpoints", "services"]
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alloy-logs
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alloy-logs
+subjects:
+  - kind: ServiceAccount
+    name: alloy-logs
+    namespace: monitoring
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-logs-config
+  namespace: monitoring
+data:
+  config.alloy: |
+    // Discover all pods, keep only the banking namespace.
+    discovery.kubernetes "pods" {
+      role = "pod"
+    }
+
+    discovery.relabel "banking" {
+      targets = discovery.kubernetes.pods.targets
+
+      rule {
+        source_labels = ["__meta_kubernetes_namespace"]
+        regex         = "banking"
+        action        = "keep"
+      }
+      // Skip the istio-proxy sidecar — app logs only.
+      rule {
+        source_labels = ["__meta_kubernetes_pod_container_name"]
+        regex         = "istio-proxy"
+        action        = "drop"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_namespace"]
+        target_label  = "namespace"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_name"]
+        target_label  = "pod"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_container_name"]
+        target_label  = "container"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_app"]
+        target_label  = "app"
+      }
+    }
+
+    loki.source.kubernetes "banking" {
+      targets    = discovery.relabel.banking.output
+      forward_to = [loki.process.filter.receiver]
+    }
+
+    // Drop DEBUG/TRACE lines — keep INFO and above (free-tier volume control).
+    loki.process "filter" {
+      forward_to = [loki.write.grafana_cloud.receiver]
+
+      stage.match {
+        selector = "{namespace=\"banking\"} |~ \" (DEBUG|TRACE) \""
+        action   = "drop"
+      }
+    }
+
+    loki.write "grafana_cloud" {
+      endpoint {
+        url = sys.env("LOKI_URL")
+        basic_auth {
+          username = sys.env("LOKI_USER")
+          password = sys.env("LOKI_PASSWORD")
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: alloy-logs
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: alloy-logs
+  template:
+    metadata:
+      labels:
+        app: alloy-logs
+    spec:
+      serviceAccountName: alloy-logs
+      containers:
+        - name: alloy
+          image: grafana/alloy:v1.5.0
+          args: ["run", "/etc/alloy/config.alloy", "--storage.path=/var/lib/alloy/data"]
+          env:
+            - name: LOKI_URL
+              valueFrom:
+                secretKeyRef:
+                  name: loki-cloud-creds
+                  key: url
+            - name: LOKI_USER
+              valueFrom:
+                secretKeyRef:
+                  name: loki-cloud-creds
+                  key: username
+            - name: LOKI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: loki-cloud-creds
+                  key: password
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alloy
+            - name: data
+              mountPath: /var/lib/alloy/data
+            - name: varlog
+              mountPath: /var/log
+            - name: varlogpods
+              mountPath: /var/log/pods
+      volumes:
+        - name: config
+          configMap:
+            name: alloy-logs-config
+        - name: data
+          emptyDir: {}
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlogpods
+          hostPath:
+            path: /var/log/pods
