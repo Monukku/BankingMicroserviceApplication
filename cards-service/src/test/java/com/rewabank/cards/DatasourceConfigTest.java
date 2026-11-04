@@ -20,4 +20,14 @@ class DatasourceConfigTest {
         assertThat(yaml.getObject().getProperty("spring.datasource.hikari.connection-timeout"))
                 .isEqualTo("3000");
     }
+
+    @Test
+    void hikariMaxLifetime_recyclesBeforeNeonIdleCutoff() {
+        // Neon's serverless pooler drops idle connections server-side (~5 min). Hikari must
+        // recycle before that or load hits stale "connection has been closed" failures.
+        YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();
+        yaml.setResources(new ClassPathResource("application.yml"));
+        long maxLifetime = Long.parseLong(yaml.getObject().getProperty("spring.datasource.hikari.max-lifetime"));
+        assertThat(maxLifetime).isPositive().isLessThanOrEqualTo(300_000L);
+    }
 }
